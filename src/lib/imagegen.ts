@@ -118,6 +118,27 @@ async function paintWithGemini(persona: Persona): Promise<string> {
   return `data:${mime};base64,${part.inlineData.data}`;
 }
 
+// ── Pollinations.ai mystery portrait (no key, free) ─────────────────────────
+// Used only when Claude couldn't identify the object (objectRecognized === false).
+const MYSTERY_PROMPT =
+  "a whimsical abstract mystery creature, colorful, cartoon style, glowing question marks, playful, no text";
+
+export async function generateMysteryPortrait(fallbackDataUrl: string): Promise<string> {
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(MYSTERY_PROMPT)}?width=512&height=512&nologo=true`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) throw new Error(`Pollinations ${res.status}`);
+    return url;
+  } catch (e) {
+    console.warn("generateMysteryPortrait: Pollinations unavailable, using raw photo:", (e as Error).message);
+    return fallbackDataUrl;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // ── Midjourney via your own proxy (no official API) ──────────────────────────
 // TODO: implement. POST { prompt: persona.portraitPrompt } to MIDJOURNEY_PROXY_URL,
 // poll/await the resulting image URL, return it.

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { config, caps, logCapabilities } from "./config.js";
 import { awaken, reply } from "./lib/claude.js";
-import { paintPortrait } from "./lib/imagegen.js";
+import { paintPortrait, generateMysteryPortrait } from "./lib/imagegen.js";
 import { transcribe, speak } from "./lib/deepgram.js";
 import { loadState, saveState } from "./lib/memory.js";
 import type { SessionState } from "./types.js";
@@ -44,7 +44,13 @@ app.post("/api/awaken", async (req, res) => {
     const prior = await loadState(persona.objectKey);
 
     // 3. Paint the portrait (skip if we already have one for this object).
-    const portraitUrl = prior?.portraitUrl ?? (await paintPortrait(persona, dataUrl));
+    //    Unrecognized objects get a Pollinations mystery creature instead of
+    //    the normal image-gen path.
+    const portraitUrl =
+      prior?.portraitUrl ??
+      (persona.objectRecognized
+        ? await paintPortrait(persona, dataUrl)
+        : await generateMysteryPortrait(dataUrl));
 
     const state: SessionState = {
       persona: prior?.persona ?? persona,

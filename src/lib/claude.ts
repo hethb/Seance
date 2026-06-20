@@ -95,6 +95,11 @@ const EMIT_PERSONA_TOOL: Anthropic.Tool = {
         description:
           "An image-gen prompt to paint this object as an anthropomorphic character portrait, matching its real colors/shape, with an expressive face and dramatic lighting.",
       },
+      objectRecognized: {
+        type: "boolean",
+        description:
+          "true if you can confidently identify the object. false ONLY if the image is too blurry/ambiguous to identify at all — in that case give the character an existentially bewildered personality.",
+      },
     },
     required: [
       "archetype",
@@ -107,6 +112,7 @@ const EMIT_PERSONA_TOOL: Anthropic.Tool = {
       "voiceModel",
       "systemPrompt",
       "portraitPrompt",
+      "objectRecognized",
     ],
   },
 };
@@ -168,6 +174,7 @@ function validatePersona(input: unknown): Persona | null {
     voiceModel,
     systemPrompt: (p.systemPrompt as string).trim(),
     portraitPrompt: (p.portraitPrompt as string).trim(),
+    objectRecognized: p.objectRecognized !== false,
   };
 }
 
@@ -287,6 +294,7 @@ function fallbackPersona(): Persona {
       "You are The Object, a deadpan, unflappable spirit of total understatement. Treat every situation — however absurd — with flat, unhurried calm. Keep replies to 1-3 sentences since they are spoken aloud. Never break character.",
     portraitPrompt:
       "a nondescript everyday object with a single calm, half-lidded eye, flat neutral expression, soft dramatic lighting, deadpan mood",
+    objectRecognized: false,
   };
 }
 
@@ -306,6 +314,7 @@ function mockPersona(): Persona {
     systemPrompt:
       "You are Mock, a friendly placeholder spirit. Keep replies to 1-2 sentences. Gently remind the user that adding ANTHROPIC_API_KEY will unlock real, object-specific personalities. Never break character.",
     portraitPrompt: "a glowing translucent ghost shaped like a question mark, friendly face",
+    objectRecognized: true,
   };
 }
 

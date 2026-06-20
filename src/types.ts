@@ -21,6 +21,8 @@ export interface Persona {
   systemPrompt: string;
   /** Prompt handed to the image generator to paint the character portrait. */
   portraitPrompt: string;
+  /** False when Claude couldn't confidently identify the object — triggers mystery portrait. */
+  objectRecognized: boolean;
 }
 
 /** One turn of dialogue, stored in Redis so the object has a memory. */
