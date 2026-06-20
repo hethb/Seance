@@ -3,7 +3,7 @@ import multer from "multer";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { config, caps, logCapabilities } from "./config.js";
-import { awaken, reply } from "./lib/claude.js";
+import { awaken, reply, type ImageInput } from "./lib/claude.js";
 import { paintPortrait, generateMysteryPortrait } from "./lib/imagegen.js";
 import { transcribe, speak } from "./lib/deepgram.js";
 import { loadState, saveState } from "./lib/memory.js";
@@ -23,21 +23,26 @@ app.use(express.static(join(__dirname, "..", "public")));
 
 /**
  * POST /api/awaken
- * Body: { image: "data:image/jpeg;base64,..." }
+ * Body: { image: "data:image/jpeg;base64,..." | "https://..." }
  * Pipeline: photo → Claude invents persona → paint portrait → load/save memory.
  * Returns the persona + portrait + how many times this object has been met.
  */
 app.post("/api/awaken", async (req, res) => {
   try {
-    const dataUrl: string = req.body.image;
-    if (!dataUrl?.startsWith("data:")) {
-      return res.status(400).json({ error: "Expected { image: dataURL }" });
+    const image: string = req.body.image;
+    let input: ImageInput;
+    if (image?.startsWith("data:")) {
+      const [, mediaType = "image/jpeg", base64 = ""] =
+        image.match(/^data:([^;]+);base64,(.+)$/) ?? [];
+      input = { base64, mediaType };
+    } else if (/^https?:\/\//.test(image ?? "")) {
+      input = { url: image };
+    } else {
+      return res.status(400).json({ error: "Expected { image: dataURL | https URL }" });
     }
-    const [, mediaType = "image/jpeg", base64 = ""] =
-      dataUrl.match(/^data:([^;]+);base64,(.+)$/) ?? [];
 
     // 1. Channel the character from the photo.
-    const persona = await awaken(base64, mediaType);
+    const persona = await awaken(input);
     persona.objectKey = normalizeKey(persona.objectKey);
 
     // 2. Has this object been awakened before? (memory / the "remembers you" beat)
@@ -49,8 +54,8 @@ app.post("/api/awaken", async (req, res) => {
     const portraitUrl =
       prior?.portraitUrl ??
       (persona.objectRecognized
-        ? await paintPortrait(persona, dataUrl)
-        : await generateMysteryPortrait(dataUrl));
+        ? await paintPortrait(persona, image)
+        : await generateMysteryPortrait(image));
 
     const state: SessionState = {
       persona: prior?.persona ?? persona,
@@ -65,6 +70,7 @@ app.post("/api/awaken", async (req, res) => {
       portraitUrl: state.portraitUrl,
       encounters: state.encounters,
       returning: Boolean(prior),
+      history: state.history,
     });
   } catch (err) {
     console.error("awaken failed:", err);
@@ -123,6 +129,81 @@ app.get("/api/status", (_req, res) => {
     redis: caps.hasRedis,
     imageProvider: config.imageProvider,
   });
+});
+
+/**
+ * GET /api/persona/:objectKey
+ * Returns the saved persona + history for an already-awakened object.
+ * Used by the Expo conversation screen to restore state without a new photo.
+ */
+app.get("/api/persona/:objectKey", async (req, res) => {
+  const state = await loadState(req.params.objectKey);
+  if (!state) return res.status(404).json({ error: "Unknown object — awaken it first." });
+  res.json({
+    persona: state.persona,
+    portraitUrl: state.portraitUrl,
+    encounters: state.encounters,
+    history: state.history,
+  });
+});
+
+/**
+ * POST /api/voice-token
+ * Mints a short-lived Deepgram token (1 h) so the mobile app never ships the raw key.
+ * Falls back to a mock token when Deepgram is not configured (dev mode).
+ */
+app.post("/api/voice-token", async (req, res) => {
+  if (!config.deepgramKey) {
+    return res.json({ token: "mock-token", expiresAt: Date.now() + 3_600_000 });
+  }
+  try {
+    const r = await fetch("https://api.deepgram.com/v1/auth/grant", {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${config.deepgramKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ttl_seconds: 3600 }),
+    });
+    if (!r.ok) throw new Error(`Deepgram grant ${r.status}: ${await r.text()}`);
+    const { access_token, expires_in } = (await r.json()) as any;
+    res.json({ token: access_token, expiresAt: Date.now() + expires_in * 1000 });
+  } catch (err) {
+    console.error("voice-token failed:", err);
+    res.status(502).json({ error: String(err) });
+  }
+});
+
+/**
+ * POST /api/turns
+ * Body: { objectKey, turns: Array<{ role: "user" | "assistant", text: string }> }
+ * Atomically appends a full exchange (user turn + assistant reply) in one write.
+ * Batching prevents the lost-update race where two concurrent single-turn calls
+ * both loadState, both push, and the second saveState drops the first turn.
+ */
+app.post("/api/turns", async (req, res) => {
+  const { objectKey, turns } = req.body as {
+    objectKey: string;
+    turns: Array<{ role: string; text: string }>;
+  };
+  if (!objectKey || !Array.isArray(turns) || turns.length === 0) {
+    return res.status(400).json({ error: "objectKey and a non-empty turns array are required." });
+  }
+  for (const t of turns) {
+    if (t.role !== "user" && t.role !== "assistant") {
+      return res.status(400).json({ error: `Invalid role "${t.role}" — must be "user" or "assistant".` });
+    }
+    if (!t.text) {
+      return res.status(400).json({ error: "Each turn must have a non-empty text field." });
+    }
+  }
+  const state = await loadState(objectKey);
+  if (!state) return res.status(404).json({ error: "Unknown object — awaken it first." });
+  for (const t of turns) {
+    state.history.push({ role: t.role as "user" | "assistant", text: t.text });
+  }
+  await saveState(state);
+  res.json({ ok: true });
 });
 
 app.listen(config.port, () => {
