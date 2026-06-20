@@ -53,6 +53,7 @@ app.post("/api/awaken", async (req, res) => {
       portraitUrl: state.portraitUrl,
       encounters: state.encounters,
       returning: Boolean(prior),
+      history: state.history,
     });
   } catch (err) {
     console.error("awaken failed:", err);
@@ -101,6 +102,71 @@ app.post("/api/converse", upload.single("audio"), async (req, res) => {
     console.error("converse failed:", err);
     res.status(500).json({ error: String(err) });
   }
+});
+
+/**
+ * GET /api/persona/:objectKey
+ * Returns the saved persona + history for an already-awakened object.
+ * Used by the Expo conversation screen to restore state without a new photo.
+ */
+app.get("/api/persona/:objectKey", async (req, res) => {
+  const state = await loadState(req.params.objectKey);
+  if (!state) return res.status(404).json({ error: "Unknown object — awaken it first." });
+  res.json({
+    persona: state.persona,
+    portraitUrl: state.portraitUrl,
+    encounters: state.encounters,
+    history: state.history,
+  });
+});
+
+/**
+ * POST /api/voice-token
+ * Mints a short-lived Deepgram token (1 h) so the mobile app never ships the raw key.
+ * Falls back to a mock token when Deepgram is not configured (dev mode).
+ */
+app.post("/api/voice-token", async (req, res) => {
+  if (!config.deepgramKey) {
+    return res.json({ token: "mock-token", expiresAt: Date.now() + 3_600_000 });
+  }
+  try {
+    const r = await fetch("https://api.deepgram.com/v1/auth/grant", {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${config.deepgramKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ttl_seconds: 3600 }),
+    });
+    if (!r.ok) throw new Error(`Deepgram grant ${r.status}: ${await r.text()}`);
+    const { access_token, expires_in } = (await r.json()) as any;
+    res.json({ token: access_token, expiresAt: Date.now() + expires_in * 1000 });
+  } catch (err) {
+    console.error("voice-token failed:", err);
+    res.status(502).json({ error: String(err) });
+  }
+});
+
+/**
+ * POST /api/turn
+ * Body: { objectKey, role: "user" | "assistant", text }
+ * Appends one conversation turn to the object's Redis history.
+ * Called by the Expo app after each ConversationText event from the Voice Agent.
+ */
+app.post("/api/turn", async (req, res) => {
+  const { objectKey, role, text } = req.body as {
+    objectKey: string;
+    role: "user" | "assistant";
+    text: string;
+  };
+  if (!objectKey || !role || !text) {
+    return res.status(400).json({ error: "objectKey, role, and text are required." });
+  }
+  const state = await loadState(objectKey);
+  if (!state) return res.status(404).json({ error: "Unknown object — awaken it first." });
+  state.history.push({ role, text });
+  await saveState(state);
+  res.json({ ok: true });
 });
 
 app.listen(config.port, () => {
