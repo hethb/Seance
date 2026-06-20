@@ -148,26 +148,33 @@ app.post("/api/voice-token", async (req, res) => {
 });
 
 /**
- * POST /api/turn
- * Body: { objectKey, role: "user" | "assistant", text }
- * Appends one conversation turn to the object's Redis history.
- * Called by the Expo app after each ConversationText event from the Voice Agent.
+ * POST /api/turns
+ * Body: { objectKey, turns: Array<{ role: "user" | "assistant", text: string }> }
+ * Atomically appends a full exchange (user turn + assistant reply) in one write.
+ * Batching prevents the lost-update race where two concurrent single-turn calls
+ * both loadState, both push, and the second saveState drops the first turn.
  */
-app.post("/api/turn", async (req, res) => {
-  const { objectKey, role, text } = req.body as {
+app.post("/api/turns", async (req, res) => {
+  const { objectKey, turns } = req.body as {
     objectKey: string;
-    role: "user" | "assistant";
-    text: string;
+    turns: Array<{ role: string; text: string }>;
   };
-  if (!objectKey || !role || !text) {
-    return res.status(400).json({ error: "objectKey, role, and text are required." });
+  if (!objectKey || !Array.isArray(turns) || turns.length === 0) {
+    return res.status(400).json({ error: "objectKey and a non-empty turns array are required." });
   }
-  if (role !== "user" && role !== "assistant") {
-    return res.status(400).json({ error: `Invalid role "${role}" — must be "user" or "assistant".` });
+  for (const t of turns) {
+    if (t.role !== "user" && t.role !== "assistant") {
+      return res.status(400).json({ error: `Invalid role "${t.role}" — must be "user" or "assistant".` });
+    }
+    if (!t.text) {
+      return res.status(400).json({ error: "Each turn must have a non-empty text field." });
+    }
   }
   const state = await loadState(objectKey);
   if (!state) return res.status(404).json({ error: "Unknown object — awaken it first." });
-  state.history.push({ role, text });
+  for (const t of turns) {
+    state.history.push({ role: t.role as "user" | "assistant", text: t.text });
+  }
   await saveState(state);
   res.json({ ok: true });
 });

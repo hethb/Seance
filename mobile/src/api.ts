@@ -43,14 +43,14 @@ export async function fetchVoiceToken(): Promise<VoiceTokenResponse> {
   return res.json();
 }
 
-export async function postTurn(
+export async function postTurns(
   objectKey: string,
-  role: "user" | "assistant",
-  text: string,
+  turns: Turn[],
 ): Promise<void> {
-  await fetch(`${API_BASE}/api/turn`, {
+  if (turns.length === 0) return;
+  await fetch(`${API_BASE}/api/turns`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ objectKey, role, text }),
+    body: JSON.stringify({ objectKey, turns }),
   });
 }

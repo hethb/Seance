@@ -1,10 +1,9 @@
 import { useCallback, useRef, useState } from "react";
 import { configure, useDeepgramVoiceAgent } from "react-native-deepgram";
-import { fetchVoiceToken, postTurn } from "../api";
+import { fetchVoiceToken, postTurns } from "../api";
 import type { Persona, Turn } from "../types";
 
-// LLM model for the voice loop — Haiku is fast enough for real-time; persona quality
-// comes from systemPrompt, not model size.
+// Haiku is fast enough for a spoken voice loop; persona quality comes from systemPrompt.
 const THINK_MODEL = "claude-haiku-4-5-20251001";
 
 export type VoiceStatus =
@@ -28,11 +27,13 @@ export interface VoiceSession {
  * - Fetches a short-lived token from the backend before connecting
  * - Configures the agent with the object's persona (systemPrompt, voice, greeting)
  * - Seeds the LLM prompt with the last 3 exchanges so the object remembers prior chats
- * - Persists each ConversationText turn to Redis via POST /api/turn
+ * - Buffers turns per exchange and flushes them atomically on onAgentAudioDone to avoid
+ *   the lost-update race when user+assistant ConversationText events arrive in rapid succession
+ * - Skips persisting the greeting (backstory) so it doesn't contaminate history recaps
  *
- * Usage (in Task 3's conversation screen):
- *   const { status, transcript, connect, disconnect } = useVoiceSession(persona, history);
- *   useEffect(() => { connect(); return () => disconnect(); }, []);
+ * This hook must only be called once the real Persona is available (not a placeholder),
+ * so that defaultSettings and all callbacks close over the correct objectKey and systemPrompt.
+ * See ConversationView in conversation.tsx for the correct call site.
  */
 export function useVoiceSession(
   persona: Persona,
@@ -41,24 +42,29 @@ export function useVoiceSession(
   const [status, setStatus] = useState<VoiceStatus>("idle");
   const [transcript, setTranscript] = useState<Turn[]>(priorHistory);
   const [error, setError] = useState<string | null>(null);
-  // Track whether we've configured the global Deepgram client with a fresh token.
-  const configuredRef = useRef(false);
 
-  // Seed the system prompt with the last 3 exchanges so the object remembers.
-  const buildThinkPrompt = useCallback((): string => {
+  const configuredRef = useRef(false);
+  // Set to true after the first assistant ConversationText (the greeting) fires,
+  // so we can skip persisting it — it's not a real exchange turn.
+  const greetingFiredRef = useRef(false);
+  // Buffer turns within one exchange; flushed atomically on onAgentAudioDone.
+  const pendingTurnsRef = useRef<Turn[]>([]);
+
+  // Seed the system prompt with the last 3 exchanges so the object remembers prior chats.
+  const buildThinkPrompt = (): string => {
     const recent = priorHistory.slice(-6);
     if (recent.length === 0) return persona.systemPrompt;
     const recap = recent
       .map((t) => `${t.role === "user" ? "Human" : persona.name}: ${t.text}`)
       .join("\n");
     return `${persona.systemPrompt}\n\nPrevious conversation (remember this):\n${recap}`;
-  }, [persona, priorHistory]);
+  };
 
   const agent = useDeepgramVoiceAgent({
     autoStartMicrophone: true,
     autoPlayAudio: true,
     trackState: true,
-    trackConversation: false, // we own the transcript
+    trackConversation: false,
     trackAgentStatus: true,
 
     defaultSettings: {
@@ -71,18 +77,12 @@ export function useVoiceSession(
           provider: { type: "deepgram", model: "nova-3", smart_format: true },
         },
         think: {
-          provider: {
-            type: "anthropic",
-            model: THINK_MODEL,
-            temperature: 0.9,
-          },
+          provider: { type: "anthropic", model: THINK_MODEL, temperature: 0.9 },
           prompt: buildThinkPrompt(),
         },
         speak: {
           provider: { type: "deepgram", model: persona.voiceModel },
         },
-        // The backstory becomes the agent's opening line — it plays as the first
-        // TTS audio and fires as a ConversationText event.
         greeting: persona.backstory,
       },
     },
@@ -102,16 +102,33 @@ export function useVoiceSession(
     },
     onUserStartedSpeaking: () => setStatus("user-speaking"),
     onAgentStartedSpeaking: () => setStatus("agent-speaking"),
-    onAgentAudioDone: () => setStatus("ready"),
+
+    onAgentAudioDone: () => {
+      setStatus("ready");
+      // Flush the buffered turns for this exchange in one atomic write.
+      const pending = pendingTurnsRef.current;
+      if (pending.length > 0) {
+        pendingTurnsRef.current = [];
+        postTurns(persona.objectKey, pending).catch(console.warn);
+      }
+    },
 
     onConversationText: ({ role, content }) => {
       const turn: Turn = {
         role: role === "assistant" || role === "agent" ? "assistant" : "user",
         text: content,
       };
+      // Always show in transcript.
       setTranscript((prev) => [...prev, turn]);
-      // Fire-and-forget: persist to Redis so the object remembers this conversation.
-      postTurn(persona.objectKey, turn.role, turn.text).catch(console.warn);
+
+      // Skip persisting the opening greeting — it's persona.backstory, not a real
+      // exchange turn. Storing it would contaminate the history recap with N copies
+      // of the backstory after N sessions, crowding out real conversation context.
+      if (turn.role === "assistant" && !greetingFiredRef.current) {
+        greetingFiredRef.current = true;
+        return;
+      }
+      pendingTurnsRef.current.push(turn);
     },
   });
 
@@ -137,6 +154,8 @@ export function useVoiceSession(
   const disconnect = useCallback(() => {
     agent.disconnect();
     configuredRef.current = false;
+    greetingFiredRef.current = false;
+    pendingTurnsRef.current = [];
     setStatus("idle");
   }, [agent]);
 
