@@ -1,0 +1,26 @@
+{
+  "name": "seance",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Point your camera at any object and it wakes up as a character you can have a live voice conversation with.",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0",
+    "dotenv": "^17.0.0",
+    "express": "^5.0.0",
+    "multer": "^2.0.0",
+    "redis": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
