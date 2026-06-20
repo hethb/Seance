@@ -2,10 +2,11 @@
  * Conversation screen — the live voice chat with the awakened object.
  *
  * For Task 3 integration: pass `objectKey` as a route param from your camera screen.
- * The screen fetches the persona, then auto-connects the voice agent.
- *
- * Integration example (from Task 3's camera screen):
  *   router.push({ pathname: "/conversation", params: { objectKey: data.persona.objectKey } });
+ *
+ * Architecture: ConversationScreen (loading shell) → ConversationView (voice logic).
+ * useVoiceSession is only called inside ConversationView, which mounts only after
+ * personaData is available, so the hook never sees EMPTY_PERSONA.
  */
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -63,14 +64,8 @@ function StatusRing({ status }: { status: VoiceStatus }) {
   }, [status, pulse]);
 
   const color = RING_COLORS[status];
-
   return (
-    <Animated.View
-      style={[
-        s.ring,
-        { borderColor: color, transform: [{ scale: pulse }] },
-      ]}
-    >
+    <Animated.View style={[s.ring, { borderColor: color, transform: [{ scale: pulse }] }]}>
       <View style={[s.ringInner, { backgroundColor: color + "22" }]}>
         <Text style={[s.ringIcon, { color }]}>
           {status === "agent-speaking" ? "🔊" : status === "user-speaking" ? "🎙️" : "🔮"}
@@ -96,7 +91,7 @@ function TurnLine({ turn, personaName }: { turn: Turn; personaName: string }) {
   );
 }
 
-// ── Main screen ───────────────────────────────────────────────────────────────
+// ── Loading shell ─────────────────────────────────────────────────────────────
 
 export default function ConversationScreen() {
   const { objectKey } = useLocalSearchParams<{ objectKey: string }>();
@@ -104,9 +99,7 @@ export default function ConversationScreen() {
 
   const [personaData, setPersonaData] = useState<PersonaResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const listRef = useRef<FlatList>(null);
 
-  // Load persona from backend on mount.
   useEffect(() => {
     if (!objectKey) return;
     fetchPersona(objectKey)
@@ -117,42 +110,14 @@ export default function ConversationScreen() {
       .catch((err) => setLoadError(String(err)));
   }, [objectKey, navigation]);
 
-  // Voice session — only initialized once persona is loaded.
-  const session = useVoiceSession(
-    personaData?.persona ?? EMPTY_PERSONA,
-    personaData?.history ?? [],
-  );
-
-  // Auto-scroll transcript to bottom on new turn.
-  useEffect(() => {
-    if (session.transcript.length > 0) {
-      listRef.current?.scrollToEnd({ animated: true });
-    }
-  }, [session.transcript.length]);
-
-  // Auto-connect when persona loads.
-  useEffect(() => {
-    if (personaData) session.connect();
-    return () => session.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!personaData]);
-
-  const handleToggle = useCallback(() => {
-    if (session.status === "idle" || session.status === "error") {
-      session.connect();
-    } else {
-      session.disconnect();
-    }
-  }, [session]);
-
-  // ── Loading / error states ────────────────────────────────────────────────
-
   if (loadError) {
     return (
       <SafeAreaView style={s.safe}>
         <View style={s.center}>
           <Text style={s.errorText}>{loadError}</Text>
-          <Text style={s.hint}>Make sure the backend is running and the object has been awakened.</Text>
+          <Text style={s.hint}>
+            Make sure the backend is running and the object has been awakened.
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -169,17 +134,42 @@ export default function ConversationScreen() {
     );
   }
 
+  return <ConversationView personaData={personaData} />;
+}
+
+// ── Voice view — only mounts once persona is available ───────────────────────
+// useVoiceSession is called here, never with EMPTY_PERSONA, so defaultSettings
+// and the onConversationText closure both see the real persona from the start.
+
+function ConversationView({ personaData }: { personaData: PersonaResponse }) {
   const { persona, portraitUrl, encounters } = personaData;
+
+  const session = useVoiceSession(persona, personaData.history);
+  const listRef = useRef<FlatList>(null);
+
+  // Connect once on mount; disconnect on unmount. Persona is stable here.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { session.connect(); return () => session.disconnect(); }, []);
+
+  useEffect(() => {
+    if (session.transcript.length > 0) {
+      listRef.current?.scrollToEnd({ animated: true });
+    }
+  }, [session.transcript.length]);
+
+  const handleToggle = useCallback(() => {
+    if (session.status === "idle" || session.status === "error") {
+      session.connect();
+    } else {
+      session.disconnect();
+    }
+  }, [session]);
 
   return (
     <SafeAreaView style={s.safe} edges={["bottom"]}>
       {/* Portrait + identity */}
       <View style={s.header}>
-        <Image
-          source={{ uri: portraitUrl }}
-          style={s.portrait}
-          resizeMode="cover"
-        />
+        <Image source={{ uri: portraitUrl }} style={s.portrait} resizeMode="cover" />
         <View style={s.identity}>
           <Text style={s.name}>{persona.name}</Text>
           <Text style={s.tagline}>{persona.tagline}</Text>
@@ -203,9 +193,7 @@ export default function ConversationScreen() {
         style={s.transcript}
         data={session.transcript}
         keyExtractor={(_, i) => String(i)}
-        renderItem={({ item }) => (
-          <TurnLine turn={item} personaName={persona.name} />
-        )}
+        renderItem={({ item }) => <TurnLine turn={item} personaName={persona.name} />}
         ListEmptyComponent={
           <Text style={s.emptyText}>
             {session.status === "connecting"
@@ -238,19 +226,6 @@ export default function ConversationScreen() {
     </SafeAreaView>
   );
 }
-
-// Placeholder so the hook can be called unconditionally before persona loads.
-const EMPTY_PERSONA = {
-  objectKey: "",
-  object: "",
-  name: "",
-  tagline: "",
-  backstory: "",
-  traits: [],
-  voiceModel: "aura-2-thalia-en",
-  systemPrompt: "",
-  portraitPrompt: "",
-};
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#0d0d1a" },
@@ -313,16 +288,8 @@ const s = StyleSheet.create({
   turnTextUser: { color: "#d1d5db" },
   turnTextAgent: { color: "#e8d5ff" },
 
-  footer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#1e1e3a",
-  },
-  endBtn: {
-    borderRadius: 10,
-    padding: 16,
-    alignItems: "center",
-  },
+  footer: { padding: 16, borderTopWidth: 1, borderTopColor: "#1e1e3a" },
+  endBtn: { borderRadius: 10, padding: 16, alignItems: "center" },
   endBtnStart: { backgroundColor: "#7c3aed" },
   endBtnStop: { backgroundColor: "#1e1e3a", borderWidth: 1, borderColor: "#3f3f60" },
   endBtnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
