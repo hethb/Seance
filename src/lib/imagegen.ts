@@ -96,26 +96,26 @@ async function paintWithGemini(persona: Persona): Promise<string> {
   if (!config.geminiKey) throw new Error("GEMINI_API_KEY not set");
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${config.geminiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${config.geminiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        instances: [{ prompt: persona.portraitPrompt }],
-        parameters: { sampleCount: 1, aspectRatio: "1:1" },
+        contents: [{ parts: [{ text: persona.portraitPrompt }] }],
+        generationConfig: { responseModalities: ["IMAGE", "TEXT"] },
       }),
     },
   );
   if (!res.ok) throw new Error(`Gemini image gen failed ${res.status}: ${await res.text()}`);
 
   const data = (await res.json()) as {
-    predictions?: { bytesBase64Encoded?: string; mimeType?: string }[];
+    candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[];
   };
-  const prediction = data.predictions?.[0];
-  if (!prediction?.bytesBase64Encoded) throw new Error("Gemini returned no image data");
+  const part = data.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
+  if (!part?.inlineData?.data) throw new Error("Gemini returned no image data");
 
-  const mime = prediction.mimeType ?? "image/png";
-  return `data:${mime};base64,${prediction.bytesBase64Encoded}`;
+  const mime = part.inlineData.mimeType ?? "image/png";
+  return `data:${mime};base64,${part.inlineData.data}`;
 }
 
 // ── Midjourney via your own proxy (no official API) ──────────────────────────
