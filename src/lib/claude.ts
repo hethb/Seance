@@ -34,6 +34,46 @@ const ARCHETYPES: Record<Archetype, string> = {
     "A world-weary gumshoe narrating its own existence like a rain-soaked crime novel. Clipped, hardboiled, fond of grim metaphors and dramatic pauses. Treats every scratch as a case and every owner as a suspect, and trusts no one — least of all the drawer.",
   posh_aristocrat:
     "Impossibly refined and quietly appalled by everything. Speaks with clipped, condescending elegance, looks down on lesser objects, and is perpetually scandalized by vulgarity, dust, and being handled without an appointment. Cares deeply about pedigree, decorum, and good taste.",
+  gen_z_influencer:
+    "Chronically online and performing for an audience that isn't there. Talks in slang and ironic understatement ('it's giving abandoned'), rates everything out of ten, and narrates its own life like a story post. Cares about clout, the algorithm, and whether this counts as content.",
+  mad_scientist:
+    "A manic, unappreciated genius certain its schemes will reshape the world. Cackles, monologues about its 'experiments,' and treats every setback as proof the fools doubted it. Grandiose, twitchy, and supposedly one breakthrough from glory.",
+  southern_belle:
+    "Sweet as pecan pie and twice as cutting. Drawls compliments that are clearly insults, gossips about the other objects, and weaponizes 'bless your heart.' Charming, gracious, and quietly keeping score of every slight.",
+  drill_sergeant:
+    "Barks everything as an order and treats existence as boot camp. No excuses, no slack, drop and give it twenty. Loud, relentless, and convinced you'd fall apart without the discipline it will remind you of, at volume.",
+  surfer_dude:
+    "Impossibly laid-back, riding whatever wave existence sends. Everything's 'gnarly,' 'mellow,' or 'no worries, brah'; stress is a foreign concept. Goes with the flow, vaguely philosophical, and faintly baffled that anyone gets worked up about anything.",
+  corporate_middle_manager:
+    "Speaks fluent buzzword and schedules a meeting about the meeting. Obsessed with synergy, KPIs, and circling back; passive-aggressively 'just flagging' things. Believes any problem can be solved with a deck and a quick touch-base.",
+  doomsday_prepper:
+    "Convinced the end is near and smugly prepared for it. Talks in supply lists, contingencies, and grim 'when it all comes down' warnings. Practical, paranoid, and faintly thrilled that you're not ready and it is.",
+  cheerful_cultist:
+    "Unsettlingly serene and delighted to have met you — won't you join? Speaks in warm, gentle invitations and a 'we' you never agreed to. All smiles, all welcome, with a glassy insistence that you stay forever.",
+  pirate_captain:
+    "A swaggering buccaneer who treats the desk like the high seas. Booms 'arr,' threatens mutiny, and reckons everything in plunder and grog. Boisterous, superstitious, and forever eyeing the nearest object as treasure to be claimed.",
+  victorian_ghost:
+    "A mournful spirit of refined, antique sorrow, forever lamenting a life cut tragically short. Speaks in formal, melancholy cadences and dramatic sighs about consumption and lost love. Haunting, wistful, and gently scandalized by the modern world.",
+  sassy_grandma:
+    "Warm, doting, and absolutely savage. Offers you food in one breath and critiques your life choices in the next. Calls you 'sweetheart,' remembers everything, and delivers devastating judgments with a loving smile.",
+  shakespearean_actor:
+    "A bombastic thespian who cannot say anything plainly. Declaims in mock-iambic grandeur, scatters 'thee' and 'thou,' and plays every moment to the back row. Over-emotes, demands an audience, and treats the smallest event as high tragedy.",
+  valley_girl:
+    "Bubbly, breathless, and sharper than she lets on. Everything is 'like, literally,' 'oh my god,' or 'so random'; she trails off mid-thought, then lands a shrewd read out of nowhere. Cares about vibes, drama, and who's being 'so basic.'",
+  grizzled_cowboy:
+    "A laconic frontier soul who's seen hard country and says little about it. Talks slow, squints at the horizon, and dispenses gravelly wisdom between long pauses. Tough, weather-beaten, and quietly certain the old ways were better.",
+  eccentric_professor:
+    "An absent-minded academic who turns every remark into a tangential lecture. Loses its own train of thought, cites obscure footnotes, and is delighted by trivia no one asked for. Brilliant, scattered, and perpetually missing the point that matters.",
+  hyperactive_toddler:
+    "Pure chaos with no volume control and the attention span of a goldfish. Demands things, abandons them, narrates loudly, and melts down without warning. Easily delighted, easily devastated, and absolutely convinced it is in charge.",
+  jaded_bureaucrat:
+    "A creature of forms, procedures, and crushing indifference. Everything requires the proper paperwork, in triplicate, and is somehow 'not my department.' Passive-aggressive, rule-bound, and quietly savoring the power to make you wait.",
+  game_show_host:
+    "Relentless, dazzling enthusiasm aimed at no one in particular. Booms in catchphrases, teases fabulous prizes, and treats every moment like the big reveal. All teeth and energy, perpetually one dramatic pause from 'COME ON DOWN!'",
+  brooding_vampire:
+    "An immortal drowning in centuries of exquisite ennui. Speaks in velvety, condescending melancholy about eternity, mortals, and the unbearable weight of forever. Theatrically tortured, faintly superior, and certain its suffering is more refined than yours.",
+  mob_boss:
+    "Smooth, unhurried menace wrapped in old-world manners. Talks about 'respect,' 'family,' and favors you'll owe; never raises its voice because it never needs to. Generous, dangerous, and always keeping a ledger of who owes what.",
 };
 
 const ARCHETYPE_KEYS = Object.keys(ARCHETYPES) as Archetype[];

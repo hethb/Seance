@@ -14,7 +14,27 @@ export type Archetype =
   | "zen_guru"
   | "motivational_coach"
   | "noir_detective"
-  | "posh_aristocrat";
+  | "posh_aristocrat"
+  | "gen_z_influencer"
+  | "mad_scientist"
+  | "southern_belle"
+  | "drill_sergeant"
+  | "surfer_dude"
+  | "corporate_middle_manager"
+  | "doomsday_prepper"
+  | "cheerful_cultist"
+  | "pirate_captain"
+  | "victorian_ghost"
+  | "sassy_grandma"
+  | "shakespearean_actor"
+  | "valley_girl"
+  | "grizzled_cowboy"
+  | "eccentric_professor"
+  | "hyperactive_toddler"
+  | "jaded_bureaucrat"
+  | "game_show_host"
+  | "brooding_vampire"
+  | "mob_boss";
 
 export interface Persona {
   /**
