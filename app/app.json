@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Séance",
+    "slug": "seance-app",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "seance",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0b0612"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Séance needs your camera to see the object you want to awaken.",
+        "NSMicrophoneUsageDescription": "Séance needs your microphone so you can talk to the character.",
+        "NSPhotoLibraryUsageDescription": "Séance can awaken a character from a photo in your library."
+      }
+    },
+    "android": {
+      "permissions": ["CAMERA", "RECORD_AUDIO"]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Séance needs your camera to see the object you want to awaken.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Séance can awaken a character from a photo in your library."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Séance needs your microphone so you can talk to the character."
+        }
+      ]
+    ]
+  }
+}

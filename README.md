@@ -86,6 +86,8 @@ src/
     memory.ts        loadState()/saveState() keyed by object       (Redis)
 public/
   index.html  app.js  style.css     no build step — plain ES modules
+app/
+  Expo (React Native) phone client — capture → reveal → talk. See app/README.md
 ```
 
 ## API
