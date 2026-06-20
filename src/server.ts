@@ -1,7 +1,5 @@
 import express from "express";
 import multer from "multer";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
 import { config, caps, logCapabilities } from "./config.js";
 import { awaken, reply, type ImageInput } from "./lib/claude.js";
 import { paintPortrait, generateMysteryPortrait } from "./lib/imagegen.js";
@@ -9,17 +7,16 @@ import { transcribe, speak } from "./lib/deepgram.js";
 import { loadState, saveState } from "./lib/memory.js";
 import type { SessionState } from "./types.js";
 
+// API only — the client is the Expo phone app in app/. No static web frontend.
 /** Normalize objectKey so Redis lookups are stable regardless of Claude's exact casing/spacing. */
 function normalizeKey(raw: string): string {
   return raw.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
 app.use(express.json({ limit: "15mb" }));
-app.use(express.static(join(__dirname, "..", "public")));
 
 /**
  * POST /api/awaken
