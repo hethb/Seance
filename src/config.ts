@@ -1,4 +1,7 @@
-import "dotenv/config";
+import { config as dotenvLoad } from "dotenv";
+// Load .env.local first (gitignored, has real keys), then .env as fallback.
+dotenvLoad({ path: ".env.local" });
+dotenvLoad();
 
 /**
  * Central config + capability flags. Reading env in ONE place means every module
@@ -20,10 +23,12 @@ export const config = {
   imageProvider: (process.env.IMAGE_PROVIDER ?? "mock") as
     | "mock"
     | "firefly"
-    | "midjourney",
+    | "midjourney"
+    | "gemini",
   fireflyClientId: process.env.ADOBE_FIREFLY_CLIENT_ID ?? "",
   fireflyClientSecret: process.env.ADOBE_FIREFLY_CLIENT_SECRET ?? "",
   midjourneyProxyUrl: process.env.MIDJOURNEY_PROXY_URL ?? "",
+  geminiKey: process.env.GEMINI_API_KEY ?? "",
 
   redisUrl: process.env.REDIS_URL ?? "",
 };
