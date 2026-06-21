@@ -21,14 +21,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { C, FONTS, R, SP } from '../src/theme';
 
-// ── Demo ledger data ──────────────────────────────────────────────────────────
-
-const LEDGER = [
-  { name: 'Klamp', obj: 'red stapler', n: 7, tone: '#0F6B5C' },
-  { name: 'Sir Reginald', obj: 'chipped mug', n: 3, tone: '#B8923C' },
-  { name: 'The Warden', obj: 'brass padlock', n: 1, tone: '#D93D1A' },
-];
-
 // ── Corner bracket decoration ─────────────────────────────────────────────────
 
 function CornerBracket({
@@ -298,26 +290,6 @@ export default function CaptureScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* ── Ledger ────────────────────────────────────── */}
-        <View style={styles.ledger}>
-          <View style={styles.ledgerDivider} />
-          <View style={styles.ledgerHeader}>
-            <Text style={styles.ledgerLabel}>THE LEDGER</Text>
-            <Text style={styles.ledgerCount}>3 souls bound</Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 7 }}>
-            {LEDGER.map((entry) => (
-              <View key={entry.name} style={[styles.ledgerCard, { borderLeftColor: entry.tone, flex: 1, minWidth: 0 }]}>
-                <View style={styles.ledgerCardInner}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.ledgerName} numberOfLines={1}>{entry.name}</Text>
-                    <Text style={styles.ledgerObj} numberOfLines={1}>{entry.obj} · ×{entry.n}</Text>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -563,71 +535,4 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  // Ledger
-  ledger: {
-    marginHorizontal: SP.md,
-  },
-  ledgerDivider: {
-    borderTopWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: C.amber,
-    opacity: 0.35,
-    marginBottom: SP.md,
-  },
-  ledgerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SP.sm,
-  },
-  ledgerLabel: {
-    fontFamily: FONTS.mono,
-    fontSize: 9,
-    letterSpacing: 2,
-    color: C.textMuted,
-    textTransform: 'uppercase',
-  },
-  ledgerCount: {
-    fontFamily: FONTS.mono,
-    fontSize: 9,
-    letterSpacing: 1,
-    color: C.textDimmer,
-  },
-  ledgerCard: {
-    borderLeftWidth: 3,
-    backgroundColor: '#F6EFE0',
-    borderRadius: 5,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#D8C9AC',
-  },
-  ledgerCardInner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-  },
-  ledgerName: {
-    fontFamily: FONTS.serif,
-    fontSize: 15,
-    color: C.textDark,
-    marginBottom: 1,
-  },
-  ledgerObj: {
-    fontFamily: FONTS.mono,
-    fontSize: 9,
-    color: C.textMuted,
-    letterSpacing: 0.8,
-  },
-  ledgerBadge: {
-    borderRadius: R.full,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  ledgerBadgeText: {
-    fontFamily: FONTS.monoMedium,
-    fontSize: 10,
-    letterSpacing: 1,
-  },
 });
