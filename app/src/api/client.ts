@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "../config";
-import type { AwakenResponse, ConverseResponse } from "../types";
+import type { AwakenResponse, ConverseResponse, EncounterResponse } from "../types";
 
 // Thin client over the two Séance endpoints. Adapted for React Native
 // (FormData file = { uri, name, type }).
@@ -76,4 +76,18 @@ export async function converse({
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error || `converse failed (${res.status})`);
   return data as ConverseResponse;
+}
+
+/**
+ * POST /api/encounter — generate a scripted 6-line scene between two awakened objects.
+ */
+export async function encounter(objectKey1: string, objectKey2: string, dynamic?: string): Promise<EncounterResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/encounter`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ objectKey1, objectKey2, ...(dynamic ? { dynamic } : {}) }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error || `encounter failed (${res.status})`);
+  return data as EncounterResponse;
 }

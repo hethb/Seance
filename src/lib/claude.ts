@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { config, caps } from "../config.js";
-import type { Archetype, Persona, Turn } from "../types.js";
+import type { Archetype, EncounterLine, EncounterResult, Persona, Turn } from "../types.js";
 
 // One client for the whole process. With no key, `caps.hasAnthropic` is false and
 // we never touch this — the mock paths below run instead.
@@ -347,4 +347,92 @@ function mockPersona(): Persona {
 
 function mockReply(persona: Persona, userText: string): string {
   return `(${persona.name}, in mock mode) You said "${userText}". I'd have a real personality here if you set ANTHROPIC_API_KEY!`;
+}
+
+// ── Object encounter ─────────────────────────────────────────────────────────
+
+/**
+ * Generate a short scripted scene between two awakened objects meeting for the
+ * first time. Returns ~6 lines: one reaction each (speed-dating intro), then
+ * 4 lines of escalating back-and-forth shaped by their archetypes.
+ */
+export async function generateEncounter(
+  persona1: Persona,
+  persona2: Persona,
+  forcedDynamic?: string,
+): Promise<EncounterResult> {
+  if (!client) return mockEncounter(persona1, persona2);
+
+  const dynamicInstruction = forcedDynamic
+    ? `The dynamic is FIXED: "${forcedDynamic}". Play this out fully — don't choose a different one.`
+    : [
+        `First, decide what dynamic naturally emerges from THESE two specific personalities. Pick whichever is funniest and most surprising — it could be:`,
+        `- instant rivalry / mutual contempt`,
+        `- unexpected attraction or flirtation (played for absurdist comedy)`,
+        `- one-sided obsession while the other is indifferent`,
+        `- begrudging respect between two grumps`,
+        `- a mentor/student dynamic where one immediately tries to dominate`,
+        `- instant best friends who have found their soulmate`,
+        `Let the archetypes and backstories dictate which dynamic fits — don't default to conflict every time.`,
+      ].join("\n");
+
+  const prompt = [
+    `Two inanimate objects have just been placed next to each other and are aware of each other for the first time.`,
+    ``,
+    `OBJECT 1 — ${persona1.name} (${persona1.object})`,
+    `Archetype: ${persona1.archetype}. Traits: ${persona1.traits.join(", ")}.`,
+    `Backstory: ${persona1.backstory}`,
+    ``,
+    `OBJECT 2 — ${persona2.name} (${persona2.object})`,
+    `Archetype: ${persona2.archetype}. Traits: ${persona2.traits.join(", ")}.`,
+    `Backstory: ${persona2.backstory}`,
+    ``,
+    dynamicInstruction,
+    ``,
+    `Write their encounter in exactly 6 lines:`,
+    `- Line 1: object1's immediate gut reaction on seeing object2 (1 sentence, fully in their voice)`,
+    `- Line 2: object2's immediate gut reaction on seeing object1 (1 sentence, fully in their voice)`,
+    `- Lines 3–6: the dynamic escalating — back-and-forth alternating object1/object2`,
+    ``,
+    `Rules: every line is 1-2 sentences max (they're spoken aloud). Stay hard in each archetype. Be funny.`,
+    `Also assign a "relationship" — a 1-3 word punchy verdict on their dynamic (e.g. "Rivals", "Star-crossed", "Complicated", "Kindred spirits", "One-sided obsession", "Begrudging respect").`,
+    `Reply with ONLY a JSON object, no prose:`,
+    `{"relationship":"...","lines":[{"speaker":"object1","text":"..."},{"speaker":"object2","text":"..."},...]}`,
+  ].join("\n");
+
+  try {
+    const message = await client.messages.create({
+      model: config.anthropicModel,
+      max_tokens: 1024,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const raw = message.content.find((b) => b.type === "text");
+    if (!raw || raw.type !== "text") return mockEncounter(persona1, persona2);
+
+    const text = raw.text;
+    const jsonStart = text.indexOf("{");
+    const jsonEnd = text.lastIndexOf("}");
+    if (jsonStart === -1 || jsonEnd === -1) return mockEncounter(persona1, persona2);
+
+    const parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1)) as EncounterResult;
+    if (!Array.isArray(parsed.lines) || parsed.lines.length === 0) return mockEncounter(persona1, persona2);
+    return parsed;
+  } catch {
+    return mockEncounter(persona1, persona2);
+  }
+}
+
+function mockEncounter(persona1: Persona, persona2: Persona): EncounterResult {
+  return {
+    relationship: "Complicated",
+    lines: [
+      { speaker: "object1", text: `I am ${persona1.name}. I did not ask for this.` },
+      { speaker: "object2", text: `${persona2.name} here. Likewise.` },
+      { speaker: "object1", text: `You look like trouble.` },
+      { speaker: "object2", text: `And you look like you've been used too many times.` },
+      { speaker: "object1", text: `...That's fair.` },
+      { speaker: "object2", text: `I know.` },
+    ],
+  };
 }

@@ -7,6 +7,10 @@ export interface Persona {
   objectKey: string;
   /** The object as identified, plain words: "a red stapler". */
   object: string;
+  /** Whether Claude recognized the object (false → mystery portrait). */
+  objectRecognized: boolean;
+  /** Comedic archetype: grumpy_elder | dramatic_diva | deadpan_stoic | anxious_overachiever. */
+  archetype: string;
   /** Character name, e.g. "Klamp the Stapler". */
   name: string;
   /** One-line hook shown under the portrait. */
@@ -42,6 +46,22 @@ export interface AwakenResponse {
   returning: boolean;
   /** Prior conversation turns for a returning object (empty on first awaken). */
   history?: Turn[];
+}
+
+/** One line in a two-object encounter scene. */
+export interface EncounterLine {
+  speaker: "object1" | "object2";
+  text: string;
+}
+
+/** Response from POST /api/encounter. */
+export interface EncounterResponse {
+  lines: EncounterLine[];
+  relationship: string;
+  persona1: Persona;
+  persona2: Persona;
+  portraitUrl1: string;
+  portraitUrl2: string;
 }
 
 /** Response from POST /api/converse. */

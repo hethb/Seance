@@ -48,6 +48,20 @@ export interface Turn {
   text: string;
 }
 
+/** One line in an object encounter scene. */
+export interface EncounterLine {
+  /** Which object speaks this line. */
+  speaker: "object1" | "object2";
+  text: string;
+}
+
+/** The result of a two-object encounter. */
+export interface EncounterResult {
+  lines: EncounterLine[];
+  /** Short punchy verdict on the dynamic, e.g. "Rivals", "Star-crossed", "Complicated". */
+  relationship: string;
+}
+
 /** Everything we persist per awakened object. */
 export interface SessionState {
   persona: Persona;
