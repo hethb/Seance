@@ -42,6 +42,26 @@ export async function fetchPersona(objectKey: string): Promise<PersonaResponse> 
   return res.json();
 }
 
+/** One row on the history page — a lightweight summary of an awakened object. */
+export interface HistoryItem {
+  objectKey: string;
+  name: string;
+  object: string;
+  tagline: string;
+  portraitUrl: string;
+  encounters: number;
+  turnCount: number;
+  lastMessage: string;
+}
+
+/** Every object ever awakened (most-talked-to first), for the history page. */
+export async function fetchHistory(): Promise<HistoryItem[]> {
+  const res = await fetch(`${API_BASE}/api/history`);
+  if (!res.ok) throw new Error(`fetchHistory ${res.status}`);
+  const data = await res.json();
+  return (data.items ?? []) as HistoryItem[];
+}
+
 export interface ConverseInput {
   objectKey: string;
   /** A local file URI from an expo-av Recording (e.g. file:///…/speech.m4a). */

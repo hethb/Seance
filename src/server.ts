@@ -4,7 +4,7 @@ import { config, caps, logCapabilities } from "./config.js";
 import { awaken, reply, generateEncounter, type ImageInput } from "./lib/claude.js";
 import { paintPortrait, generateMysteryPortrait } from "./lib/imagegen.js";
 import { transcribe, speak } from "./lib/deepgram.js";
-import { loadState, saveState } from "./lib/memory.js";
+import { loadState, saveState, listStates } from "./lib/memory.js";
 import type { SessionState } from "./types.js";
 
 // API only — the client is the Expo phone app in app/. No static web frontend.
@@ -160,6 +160,35 @@ app.get("/api/persona/:objectKey", async (req, res) => {
     encounters: state.encounters,
     history: state.history,
   });
+});
+
+/**
+ * GET /api/history — every awakened object, as lightweight summaries for the
+ * history page (no full transcripts). Sorted most-talked-to first.
+ */
+app.get("/api/history", async (_req, res) => {
+  try {
+    const states = await listStates();
+    const items = states
+      .map((s) => {
+        const lastReply = [...s.history].reverse().find((t) => t.role === "assistant");
+        return {
+          objectKey: s.persona.objectKey,
+          name: s.persona.name,
+          object: s.persona.object,
+          tagline: s.persona.tagline,
+          portraitUrl: s.portraitUrl,
+          encounters: s.encounters,
+          turnCount: s.history.length,
+          lastMessage: lastReply?.text ?? s.persona.tagline,
+        };
+      })
+      .sort((a, b) => b.encounters - a.encounters || b.turnCount - a.turnCount);
+    res.json({ items });
+  } catch (err) {
+    console.error("history failed:", err);
+    res.status(500).json({ error: String(err) });
+  }
 });
 
 /**
