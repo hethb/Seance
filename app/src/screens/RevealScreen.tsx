@@ -9,14 +9,16 @@ import {
   Text,
   View,
 } from "react-native";
+import { Audio } from "expo-av";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation";
 import { resolveMediaUrl } from "../config";
 import { colors, spacing, radius, font } from "../theme";
+import { converse } from "../api/client";
 
 // REVEAL — the payoff. The portrait fades + scales in like it's being conjured,
-// then the character introduces itself in its own words (persona.backstory).
+// then the character speaks its opening line unprompted.
 type Props = NativeStackScreenProps<RootStackParamList, "Reveal">;
 
 export default function RevealScreen({ route, navigation }: Props) {
@@ -28,6 +30,7 @@ export default function RevealScreen({ route, navigation }: Props) {
   const appear = useRef(new Animated.Value(0)).current;
   const [imageFailed, setImageFailed] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     Animated.timing(appear, {
@@ -37,6 +40,36 @@ export default function RevealScreen({ route, navigation }: Props) {
       useNativeDriver: true,
     }).start();
   }, [appear]);
+
+  // Speak the opening line the moment the character appears.
+  useEffect(() => {
+    let cancelled = false;
+    async function speakOpeningLine() {
+      try {
+        const data = await converse({
+          objectKey: persona.objectKey,
+          text: persona.openingLine,
+        });
+        if (cancelled || !data.audio) return;
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true }).catch(() => {});
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: `data:audio/mp3;base64,${data.audio}` },
+          { shouldPlay: true },
+        );
+        soundRef.current = sound;
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded && status.didJustFinish) sound.unloadAsync().catch(() => {});
+        });
+      } catch {
+        // No Deepgram key or network error — opening line stays as text only, no crash.
+      }
+    }
+    speakOpeningLine();
+    return () => {
+      cancelled = true;
+      soundRef.current?.unloadAsync().catch(() => {});
+    };
+  }, [persona.objectKey, persona.openingLine]);
 
   const portraitUri = resolveMediaUrl(result.portraitUrl);
 
@@ -104,11 +137,11 @@ export default function RevealScreen({ route, navigation }: Props) {
           </View>
         )}
 
-        {/* The character's first words. */}
-        {!!persona.backstory && (
+        {/* The character's first words — also spoken aloud on mount. */}
+        {!!(persona.openingLine ?? persona.backstory) && (
           <View style={styles.quote}>
             <View style={styles.quoteBar} />
-            <Text style={styles.quoteText}>{persona.backstory}</Text>
+            <Text style={styles.quoteText}>{persona.openingLine ?? persona.backstory}</Text>
           </View>
         )}
 

@@ -11,8 +11,10 @@ export interface Persona {
   name: string;
   /** One-line hook shown under the portrait. */
   tagline: string;
-  /** 2–3 sentence backstory — also the character's spoken opening line. */
+  /** 2–3 sentence backstory. */
   backstory: string;
+  /** The character's first spoken line — played aloud the instant it appears. */
+  openingLine: string;
   /** Adjectives that define voice & attitude, e.g. ["bitter", "regal"]. */
   traits: string[];
   /** Deepgram TTS voice id that fits the character. */
