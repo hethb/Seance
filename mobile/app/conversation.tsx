@@ -24,6 +24,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { AwakenResponse } from "../src/api";
 import { sessionStore } from "../src/sessionStore";
+import { FaceOverlay } from "../src/components/FaceOverlay";
 import {
   useConverse,
   type VoiceStatus,
@@ -493,11 +494,14 @@ function ConversationView({ result }: { result: AwakenResponse }) {
       <View style={cv.header}>
         <View style={cv.avatarWrap}>
           <AvatarAura speaking={agentSpeaking} />
-          <Image
-            source={{ uri: portraitUrl }}
-            style={cv.avatar}
-            resizeMode="cover"
-          />
+          <View style={cv.avatar}>
+            <Image
+              source={{ uri: portraitUrl }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+            />
+            <FaceOverlay speaking={agentSpeaking} />
+          </View>
         </View>
         <View style={cv.identity}>
           <Text style={cv.name}>{persona.name}</Text>
@@ -690,6 +694,7 @@ const cv = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#D6A94B",
     backgroundColor: "#2B241E",
+    overflow: "hidden",
   },
   identity: {
     flex: 1,

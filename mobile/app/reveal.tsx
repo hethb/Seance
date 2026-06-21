@@ -23,6 +23,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Defs, Pattern, Circle, Rect } from "react-native-svg";
 import type { AwakenResponse } from "../src/api";
 import { sessionStore } from "../src/sessionStore";
+import { FaceOverlay } from "../src/components/FaceOverlay";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -153,6 +154,8 @@ function SpiritCard({ result }: { result: AwakenResponse }) {
           style={StyleSheet.absoluteFillObject}
           pointerEvents="none"
         />
+        {/* The object comes alive — blinking eyes + drifting gaze on the portrait. */}
+        <FaceOverlay speaking={false} />
         <View style={cs.photoLabel}>
           <Text style={cs.photoLabelText}>★ AWAKENED · {formatDate()}</Text>
         </View>
