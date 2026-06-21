@@ -285,12 +285,13 @@ export default function RevealScreen() {
       }
     } catch {
       // TTS failure is silent — the text is still visible on the card
+    } finally {
+      if (mounted.current) {
+        setSpeakingIdx(null);
+        setPickerVisible(true);
+        Animated.timing(pickerOpacity, { toValue: 1, duration: 500, useNativeDriver: true }).start();
+      }
     }
-    if (!mounted.current) return;
-    setSpeakingIdx(null);
-    // Reveal picker after the first opening line finishes
-    setPickerVisible(true);
-    Animated.timing(pickerOpacity, { toValue: 1, duration: 500, useNativeDriver: true }).start();
   }, [pickerOpacity]);
 
   // Play opening line on mount (skip if in introduce mode — we navigate away immediately)
@@ -309,7 +310,8 @@ export default function RevealScreen() {
       try {
         const data = await encounter(challengerResult.persona.objectKey, result.persona.objectKey);
         if (cancelled) return;
-        router.replace({ pathname: "/encounter", params: { encounterJson: JSON.stringify(data) } });
+        sessionStore.setEncounter(data);
+        router.replace("/encounter");
       } catch {
         // If encounter fails, show the card normally so user can still séance
         if (!cancelled) setMeetingLoading(false);
