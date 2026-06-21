@@ -14,6 +14,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import Svg, { Defs, Pattern, Circle, Rect } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { awaken, type AwakenResponse } from '../src/api';
 import { C, FONTS, SP } from '../src/theme';
@@ -34,14 +35,15 @@ const MIN_DISPLAY_MS = 3500;
 // How long each log line reveal is staggered (ms)
 const LOG_STAGGER_MS = 580;
 
-// ── Grain overlay (approximation) ────────────────────────────────────────────
+// ── Grain overlay ─────────────────────────────────────────────────────────────
 
 function GrainOverlay() {
-  // Dots pattern approximated with a repeating View grid (subtle).
   return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-      <View style={styles.grainOverlay} />
-    </View>
+    <Image
+      source={require('../assets/grain.png')}
+      style={[StyleSheet.absoluteFillObject, { opacity: 0.35 }]}
+      resizeMode="repeat"
+    />
   );
 }
 
@@ -196,6 +198,12 @@ export default function AwakenScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <LinearGradient
+        colors={['#241C16', '#100C0A']}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
       <GrainOverlay />
 
       {/* Red-orange glow at top */}
@@ -203,27 +211,42 @@ export default function AwakenScreen() {
 
       <View style={styles.content}>
         {/* Photo card */}
-        <Animated.View
-          style={[styles.photoCard, { transform: [{ scale: breatheAnim }] }]}
-        >
-          {imageDataUrl ? (
-            <Image
-              source={{ uri: imageDataUrl }}
-              style={styles.photoImage}
-              resizeMode="cover"
+        <View style={styles.photoCardWrap}>
+          {/* Red-orange outer glow */}
+          <View style={styles.glowRed} />
+          {/* Teal inner glow */}
+          <View style={styles.glowTeal} />
+          <Animated.View
+            style={[styles.photoCard, { transform: [{ scale: breatheAnim }] }]}
+          >
+            {imageDataUrl ? (
+              <Image
+                source={{ uri: imageDataUrl }}
+                style={styles.photoImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.photoPlaceholder} />
+            )}
+            {/* Color overlay */}
+            <LinearGradient
+              colors={['rgba(255,90,56,0.18)', 'transparent', 'rgba(52,183,160,0.16)']}
+              start={{ x: 0.15, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+              pointerEvents="none"
             />
-          ) : (
-            <View style={styles.photoPlaceholder} />
-          )}
-          {/* Halftone overlay approximation */}
-          <LinearGradient
-            colors={['rgba(255,90,56,0.18)', 'transparent', 'rgba(52,183,160,0.16)']}
-            start={{ x: 0.15, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
-            pointerEvents="none"
-          />
-        </Animated.View>
+            {/* Halftone dot overlay */}
+            <Svg style={StyleSheet.absoluteFillObject} pointerEvents="none">
+              <Defs>
+                <Pattern id="dots" x="0" y="0" width="5" height="5" patternUnits="userSpaceOnUse">
+                  <Circle cx="2.5" cy="2.5" r="1" fill="rgba(28,24,19,0.45)" />
+                </Pattern>
+              </Defs>
+              <Rect width="100%" height="100%" fill="url(#dots)" opacity="0.4" />
+            </Svg>
+          </Animated.View>
+        </View>
 
         {/* Progress bar */}
         <View style={styles.progressTrack}>
@@ -262,15 +285,6 @@ export default function AwakenScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: C.bgAlt,
-  },
-
-  grainOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
-    opacity: 0.03,
-    // Subtle noise approximation via alternating pattern not possible in RN without SVG,
-    // so we leave this as a very faint overlay.
   },
 
   topGlow: {
@@ -292,6 +306,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.xl,
   },
 
+  // Photo card wrapper with dual glow
+  photoCardWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SP.lg + 4,
+  },
+  glowRed: {
+    position: 'absolute',
+    width: 172,
+    height: 212,
+    borderRadius: 9,
+    backgroundColor: '#FF5A38',
+    opacity: 0.22,
+    shadowColor: '#FF5A38',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 28,
+    elevation: 0,
+  },
+  glowTeal: {
+    position: 'absolute',
+    width: 192,
+    height: 232,
+    borderRadius: 12,
+    backgroundColor: '#34B7A0',
+    opacity: 0.08,
+    shadowColor: '#34B7A0',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 50,
+    elevation: 0,
+  },
   // Photo card
   photoCard: {
     width: 172,
@@ -300,13 +346,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: C.amberBright,
     overflow: 'hidden',
-    marginBottom: SP.lg + 4,
-    // Shadow
-    shadowColor: '#FF5A38',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.32,
-    shadowRadius: 20,
-    elevation: 12,
   },
   photoImage: {
     width: '100%',

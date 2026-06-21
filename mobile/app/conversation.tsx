@@ -7,6 +7,7 @@
  * useVoiceSession is only called inside ConversationView, mounted after parsing,
  * so the hook never sees a null persona.
  */
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -307,39 +308,47 @@ const cb = StyleSheet.create({
 
 function AvatarAura({ speaking }: { speaking: boolean }) {
   const opacity = useRef(new Animated.Value(0)).current;
+  const morph = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (speaking) {
-      const loop = Animated.loop(
+      const opacityLoop = Animated.loop(
         Animated.sequence([
-          Animated.timing(opacity, {
-            toValue: 0.75,
-            duration: 700,
-            useNativeDriver: true,
-          }),
-          Animated.timing(opacity, {
-            toValue: 0.2,
-            duration: 700,
-            useNativeDriver: true,
-          }),
+          Animated.timing(opacity, { toValue: 0.75, duration: 700, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.2, duration: 700, useNativeDriver: true }),
         ])
       );
-      loop.start();
-      return () => loop.stop();
+      const morphLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(morph, { toValue: 1, duration: 2400, useNativeDriver: false }),
+          Animated.timing(morph, { toValue: 0, duration: 2400, useNativeDriver: false }),
+        ])
+      );
+      opacityLoop.start();
+      morphLoop.start();
+      return () => { opacityLoop.stop(); morphLoop.stop(); };
     } else {
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+      morph.setValue(0);
     }
   }, [speaking]);
+
+  const borderRadiusTL = morph.interpolate({ inputRange: [0, 1], outputRange: [28, 22] });
+  const borderRadiusTR = morph.interpolate({ inputRange: [0, 1], outputRange: [22, 32] });
+  const borderRadiusBL = morph.interpolate({ inputRange: [0, 1], outputRange: [32, 26] });
+  const borderRadiusBR = morph.interpolate({ inputRange: [0, 1], outputRange: [24, 30] });
 
   return (
     <Animated.View
       style={[
         av.aura,
-        { opacity },
+        {
+          opacity,
+          borderTopLeftRadius: borderRadiusTL,
+          borderTopRightRadius: borderRadiusTR,
+          borderBottomLeftRadius: borderRadiusBL,
+          borderBottomRightRadius: borderRadiusBR,
+        },
       ]}
       pointerEvents="none"
     />
@@ -351,7 +360,6 @@ const av = StyleSheet.create({
     position: "absolute",
     width: 60,
     height: 60,
-    borderRadius: 30,
     backgroundColor: "#FF5A38",
     // Shadow glow approximation
     shadowColor: "#FF5A38",
@@ -497,6 +505,17 @@ function ConversationView({ result }: { result: AwakenResponse }) {
 
   return (
     <SafeAreaView style={cv.safe} edges={["top", "bottom"]}>
+      <LinearGradient
+        colors={['#231B15', '#0d0a08']}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <Image
+        source={require('../assets/grain.png')}
+        style={[StyleSheet.absoluteFillObject, { opacity: 0.25 }]}
+        resizeMode="repeat"
+      />
       {/* Header */}
       <View style={cv.header}>
         <View style={cv.avatarWrap}>
@@ -626,7 +645,7 @@ export default function ConversationScreen() {
 const cv = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#0d0a08",
+    backgroundColor: 'transparent',
   },
   center: {
     flex: 1,
@@ -664,6 +683,7 @@ const cv = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
+    overflow: 'visible',
   },
   avatar: {
     width: 46,

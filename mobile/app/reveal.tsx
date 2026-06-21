@@ -19,6 +19,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Svg, { Defs, Pattern, Circle, Rect } from "react-native-svg";
 import type { AwakenResponse } from "../src/api";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -120,6 +121,22 @@ function SpiritCard({ result }: { result: AwakenResponse }) {
           style={StyleSheet.absoluteFillObject}
           pointerEvents="none"
         />
+        <Svg style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          <Defs>
+            <Pattern id="revealDots" x="0" y="0" width="5" height="5" patternUnits="userSpaceOnUse">
+              <Circle cx="2.5" cy="2.5" r="1" fill="rgba(28,24,19,0.45)" />
+            </Pattern>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#revealDots)" opacity="0.35" />
+        </Svg>
+        <LinearGradient
+          colors={['rgba(15,11,9,0.4)', 'transparent', 'transparent', 'rgba(15,11,9,0.35)']}
+          locations={[0, 0.2, 0.8, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
         <View style={cs.photoLabel}>
           <Text style={cs.photoLabelText}>★ AWAKENED · {formatDate()}</Text>
         </View>
@@ -205,6 +222,17 @@ export default function RevealScreen() {
 
   return (
     <SafeAreaView style={ss.safe} edges={["top", "bottom"]}>
+      <LinearGradient
+        colors={['#241C16', '#0e0a08']}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <Image
+        source={require('../assets/grain.png')}
+        style={[StyleSheet.absoluteFillObject, { opacity: 0.3 }]}
+        resizeMode="repeat"
+      />
       <ScrollView
         contentContainerStyle={ss.scroll}
         showsVerticalScrollIndicator={false}
@@ -410,7 +438,7 @@ const cs = StyleSheet.create({
 const ss = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: "#0e0a08",
+    backgroundColor: 'transparent',
   },
   scroll: {
     paddingTop: 28,

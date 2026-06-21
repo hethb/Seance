@@ -3,11 +3,13 @@
  * Warm cream/sepia theme. User photographs an object to awaken its spirit.
  */
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,7 +17,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { C, FONTS, R, SP } from '../src/theme';
 
@@ -142,6 +143,17 @@ export default function CaptureScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <LinearGradient
+        colors={['#F4ECDA', '#E6DBC4']}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+      <Image
+        source={require('../assets/grain.png')}
+        style={styles.grain}
+        resizeMode="repeat"
+      />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
@@ -197,6 +209,16 @@ export default function CaptureScreen() {
                   backgroundColor: 'rgba(214,169,75,0.08)',
                 },
               ]}
+              pointerEvents="none"
+            />
+
+            {/* Inset vignette */}
+            <LinearGradient
+              colors={['rgba(15,11,9,0.5)', 'transparent', 'transparent', 'rgba(15,11,9,0.5)']}
+              locations={[0, 0.25, 0.75, 1]}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
               pointerEvents="none"
             />
 
@@ -288,11 +310,15 @@ export default function CaptureScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: C.creamLight,
+    backgroundColor: 'transparent',
+  },
+  grain: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.18,
   },
   scroll: {
     flex: 1,
-    backgroundColor: C.creamLight,
+    backgroundColor: 'transparent',
   },
   scrollContent: {
     paddingBottom: 40,
