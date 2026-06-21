@@ -456,6 +456,13 @@ function ConversationView({ result }: { result: AwakenResponse }) {
     router.back();
   }, []);
 
+  const handleIntroduce = useCallback(() => {
+    router.push({
+      pathname: "/",
+      params: { challengerJson: JSON.stringify(result) },
+    });
+  }, [result]);
+
   const handleSend = useCallback(() => {
     const text = draft.trim();
     if (!text || busy) return;
@@ -481,12 +488,6 @@ function ConversationView({ result }: { result: AwakenResponse }) {
       micScale.setValue(1);
     }
   }, [isActive]);
-
-  function micCaption(): string {
-    if (userSpeaking) return "release to send";
-    if (agentSpeaking) return "tap to interrupt";
-    return "press & hold to speak";
-  }
 
   return (
     <SafeAreaView style={cv.safe} edges={["top", "bottom"]}>
@@ -555,7 +556,12 @@ function ConversationView({ result }: { result: AwakenResponse }) {
           <View style={{ flex: 1 }}>
             <Waveform status={session.status} />
           </View>
-          <Text style={cv.micCaption}>{micCaption()}</Text>
+          <Pressable
+            style={({ pressed }) => [cv.introduceBtn, pressed && { opacity: 0.7 }]}
+            onPress={handleIntroduce}
+          >
+            <Text style={cv.introduceBtnText}>✦ introduce</Text>
+          </Pressable>
         </View>
 
         {/* Text input row */}
@@ -755,12 +761,6 @@ const cv = StyleSheet.create({
     backgroundColor: "#140f0c",
     gap: 8,
   },
-  micCaption: {
-    fontFamily: "DMMono_400Regular",
-    fontSize: 9,
-    color: "#7a6e5c",
-    letterSpacing: 0.5,
-  },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -806,5 +806,18 @@ const cv = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+  },
+  introduceBtn: {
+    borderWidth: 0.75,
+    borderColor: "#34B7A0",
+    borderRadius: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  introduceBtnText: {
+    fontFamily: "DMMono_400Regular",
+    fontSize: 9,
+    color: "#34B7A0",
+    letterSpacing: 1.5,
   },
 });
