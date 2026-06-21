@@ -104,11 +104,11 @@ export default function RevealScreen({ route, navigation }: Props) {
           </View>
         )}
 
-        {/* The character's first words. */}
-        {!!persona.backstory && (
+        {/* The character's first words — the authored opening line if present. */}
+        {!!(persona.openingLine ?? persona.backstory) && (
           <View style={styles.quote}>
             <View style={styles.quoteBar} />
-            <Text style={styles.quoteText}>{persona.backstory}</Text>
+            <Text style={styles.quoteText}>{persona.openingLine ?? persona.backstory}</Text>
           </View>
         )}
 

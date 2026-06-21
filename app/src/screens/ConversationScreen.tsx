@@ -30,11 +30,17 @@ type Props = NativeStackScreenProps<RootStackParamList, "Conversation">;
 type Turn = { role: "user" | "assistant"; text: string };
 
 export default function ConversationScreen({ route, navigation }: Props) {
-  const { persona } = route.params.result;
-  const { objectKey, name, backstory } = persona;
+  const { result } = route.params;
+  const { persona } = result;
+  const { objectKey, name, backstory, openingLine } = persona;
 
-  // The opening line is the first thing the spirit ever said — seed the log.
-  const [turns, setTurns] = useState<Turn[]>([{ role: "assistant", text: backstory }]);
+  // Seed the log: a returning object restores its prior conversation; a fresh
+  // one opens with the character's first spoken words.
+  const [turns, setTurns] = useState<Turn[]>(
+    result.history && result.history.length > 0
+      ? result.history
+      : [{ role: "assistant", text: openingLine ?? backstory }],
+  );
   const [recording, setRecording] = useState(false);
   const [sending, setSending] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -48,6 +54,7 @@ export default function ConversationScreen({ route, navigation }: Props) {
   const soundRef = useRef<Audio.Sound | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
   const mounted = useRef(true);
+  const inFlight = useRef(false); // guards against double-sending the same turn
   const busy = recording || sending; // any input that blocks the next action
 
   // Pulse animations: amber while listening, cyan while the spirit speaks.
@@ -90,6 +97,9 @@ export default function ConversationScreen({ route, navigation }: Props) {
   const stopSound = useCallback(async () => {
     if (soundRef.current) {
       try {
+        // Detach the status listener before unloading so its closure doesn't
+        // accumulate across many play cycles over a long demo day.
+        soundRef.current.setOnPlaybackStatusUpdate(null);
         await soundRef.current.unloadAsync();
       } catch {
         // already gone
@@ -129,7 +139,10 @@ export default function ConversationScreen({ route, navigation }: Props) {
 
   const send = useCallback(
     async (input: { audioUri?: string; text?: string }) => {
-      if (!mounted.current) return;
+      // Ignore a second send while one is already in flight — a retried/double
+      // tap would otherwise double-write the same turn into history.
+      if (!mounted.current || inFlight.current) return;
+      inFlight.current = true;
       setError(null);
       setSending(true);
       try {
@@ -149,6 +162,7 @@ export default function ConversationScreen({ route, navigation }: Props) {
       } catch (e: any) {
         if (mounted.current) setError(e?.message || "The connection wavered. Try again.");
       } finally {
+        inFlight.current = false;
         if (mounted.current) setSending(false);
       }
     },

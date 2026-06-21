@@ -18,15 +18,23 @@ export async function transcribe(audio: Buffer, contentType: string): Promise<st
   url.searchParams.set("smart_format", "true");
   url.searchParams.set("punctuate", "true");
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Token ${config.deepgramKey}`,
-      "Content-Type": contentType || "audio/webm",
-    },
-    // Buffer → Uint8Array so the DOM fetch types accept it as a body.
-    body: new Uint8Array(audio),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${config.deepgramKey}`,
+        "Content-Type": contentType || "audio/webm",
+      },
+      // Buffer → Uint8Array so the DOM fetch types accept it as a body.
+      body: new Uint8Array(audio),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) throw new Error(`Deepgram STT ${res.status}: ${await res.text()}`);
 
   const data = (await res.json()) as any;
@@ -45,14 +53,22 @@ export async function speak(text: string, voiceModel: string): Promise<Buffer | 
   url.searchParams.set("model", voiceModel || config.deepgramTtsModel);
   url.searchParams.set("encoding", "mp3");
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Token ${config.deepgramKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ text }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${config.deepgramKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) throw new Error(`Deepgram TTS ${res.status}: ${await res.text()}`);
 
   return Buffer.from(await res.arrayBuffer());

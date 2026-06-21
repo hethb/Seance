@@ -1,19 +1,39 @@
 import { API_BASE_URL } from "../config";
 import type { AwakenResponse, ConverseResponse } from "../types";
 
-// Thin client over the two Séance endpoints. Mirrors public/app.js on the web
-// side, adapted for React Native (FormData file = { uri, name, type }).
+// Thin client over the two Séance endpoints. Adapted for React Native
+// (FormData file = { uri, name, type }).
+
+// Every request gets a hard timeout so a hung server/upstream surfaces as a real
+// error (→ the screen's error UI) instead of a forever-spinning loader.
+async function fetchWithTimeout(url: string, init: RequestInit, ms: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (controller.signal.aborted) throw new Error("Timed out reaching the séance server.");
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * POST /api/awaken — hand the server a captured photo as a data: URL, get back
  * the channeled persona, its portrait, and whether this object is a returning one.
  */
 export async function awaken(imageDataUrl: string): Promise<AwakenResponse> {
-  const res = await fetch(`${API_BASE_URL}/api/awaken`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image: imageDataUrl }),
-  });
+  // Live awaken (vision + image-gen) can legitimately take ~15-20s; allow margin.
+  const res = await fetchWithTimeout(
+    `${API_BASE_URL}/api/awaken`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: imageDataUrl }),
+    },
+    35_000,
+  );
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error || `awaken failed (${res.status})`);
   return data as AwakenResponse;
@@ -48,10 +68,11 @@ export async function converse({
     form.append("audio", { uri: audioUri, name, type });
   }
 
-  const res = await fetch(`${API_BASE_URL}/api/converse`, {
-    method: "POST",
-    body: form,
-  });
+  const res = await fetchWithTimeout(
+    `${API_BASE_URL}/api/converse`,
+    { method: "POST", body: form },
+    30_000,
+  );
   const data = await res.json();
   if (!res.ok) throw new Error(data?.error || `converse failed (${res.status})`);
   return data as ConverseResponse;

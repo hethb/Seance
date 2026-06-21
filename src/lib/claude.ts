@@ -5,7 +5,7 @@ import type { Archetype, Persona, Turn } from "../types.js";
 // One client for the whole process. With no key, `caps.hasAnthropic` is false and
 // we never touch this — the mock paths below run instead.
 const client = caps.hasAnthropic
-  ? new Anthropic({ apiKey: config.anthropicKey })
+  ? new Anthropic({ apiKey: config.anthropicKey, timeout: 30_000, maxRetries: 1 })
   : null;
 
 // ── Persona archetypes ───────────────────────────────────────────────────────
@@ -267,18 +267,26 @@ export async function reply(
       ? `\n\nThis is encounter #${encounters} with a human — you have met before. Reference your shared history naturally if it fits.`
       : "";
 
-  const message = await client.messages.create({
-    model: config.anthropicModel,
-    max_tokens: 300,
-    // Short max_tokens keeps the spoken reply snappy in a live voice loop.
-    // Want even lower latency? Drop this call to claude-haiku-4-5, or on a newer
-    // SDK add output_config:{ effort:"low" } / enable Fast Mode (Opus 4.8 only).
-    system: persona.systemPrompt + memoryNote,
-    messages: [
-      ...history.map((t) => ({ role: t.role, content: t.text })),
-      { role: "user" as const, content: userText },
-    ],
-  });
+  // Cap replayed history so a long demo session can't grow tokens/latency
+  // unboundedly turn-over-turn — the last ~20 turns is plenty of context.
+  let message;
+  try {
+    message = await client.messages.create({
+      model: config.anthropicModel,
+      max_tokens: 300,
+      // Short max_tokens keeps the spoken reply snappy in a live voice loop.
+      system: persona.systemPrompt + memoryNote,
+      messages: [
+        ...history.slice(-20).map((t) => ({ role: t.role, content: t.text })),
+        { role: "user" as const, content: userText },
+      ],
+    });
+  } catch (err) {
+    // A transient API failure (timeout, overload, rate-limit) must NOT 500 the
+    // turn mid-conversation — stay in character with a graceful fallback line.
+    console.error("reply failed, using fallback line:", err);
+    return mockReply(persona, userText);
+  }
 
   const text = message.content.find((b) => b.type === "text");
   return text && text.type === "text" ? text.text : mockReply(persona, userText);

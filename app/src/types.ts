@@ -11,7 +11,9 @@ export interface Persona {
   name: string;
   /** One-line hook shown under the portrait. */
   tagline: string;
-  /** 2–3 sentence backstory — also the character's spoken opening line. */
+  /** The character's actual first spoken words (falls back to backstory if absent). */
+  openingLine?: string;
+  /** 2–3 sentence backstory shown under the portrait. */
   backstory: string;
   /** Adjectives that define voice & attitude, e.g. ["bitter", "regal"]. */
   traits: string[];
@@ -23,6 +25,12 @@ export interface Persona {
   portraitPrompt: string;
 }
 
+/** One stored turn of dialogue (mirrors the server's Turn). */
+export interface Turn {
+  role: "user" | "assistant";
+  text: string;
+}
+
 /** Response from POST /api/awaken. */
 export interface AwakenResponse {
   persona: Persona;
@@ -32,6 +40,8 @@ export interface AwakenResponse {
   encounters: number;
   /** True when Redis already knew this object — "it remembers you". */
   returning: boolean;
+  /** Prior conversation turns for a returning object (empty on first awaken). */
+  history?: Turn[];
 }
 
 /** Response from POST /api/converse. */

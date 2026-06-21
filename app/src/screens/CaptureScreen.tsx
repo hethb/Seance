@@ -14,6 +14,7 @@ import {
   useMicrophonePermissions,
 } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation";
 import { colors, spacing, radius, font } from "../theme";
@@ -48,8 +49,22 @@ export default function CaptureScreen({ navigation }: Props) {
     }
   }, [camPerm?.granted, micPerm?.granted]);
 
-  // Turn a base64 blob into a data-URL and send it onward to be awakened.
-  function awaken(base64?: string | null) {
+  // Downscale to ~1024px and re-encode before sending — keeps the upload small
+  // and reliable on flaky venue wifi (a full-res phone photo is several MB).
+  // Falls back to the original capture if manipulation fails.
+  async function awaken(image?: { uri?: string; base64?: string | null } | null) {
+    let base64 = image?.base64 ?? null;
+    if (image?.uri) {
+      try {
+        const ctx = ImageManipulator.manipulate(image.uri);
+        ctx.resize({ width: 1024 });
+        const ref = await ctx.renderAsync();
+        const out = await ref.saveAsync({ compress: 0.6, format: SaveFormat.JPEG, base64: true });
+        if (out.base64) base64 = out.base64;
+      } catch {
+        // resize failed — fall back to the original capture's base64 below
+      }
+    }
     if (!base64) {
       setError("The image came back empty. Try again.");
       return;
@@ -69,7 +84,7 @@ export default function CaptureScreen({ navigation }: Props) {
         quality: 0.6,
         skipProcessing: false,
       });
-      awaken(photo?.base64);
+      await awaken(photo);
     } catch (e) {
       setError("Couldn't capture that. Hold steady and try again.");
     } finally {
@@ -89,7 +104,7 @@ export default function CaptureScreen({ navigation }: Props) {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
       });
       if (result.canceled) return;
-      awaken(result.assets?.[0]?.base64);
+      await awaken(result.assets?.[0]);
     } catch (e) {
       setError("Couldn't open your library.");
     } finally {
