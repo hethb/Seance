@@ -4,7 +4,7 @@
  * After the scene: a relationship verdict + replay chips to try other dynamics.
  */
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,6 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Defs, Pattern, Circle, Rect } from "react-native-svg";
 import { Audio } from "expo-av";
 import { encounter, tts, type EncounterLine, type EncounterResponse } from "../src/api";
+import { sessionStore } from "../src/sessionStore";
 import { C, FONTS, SP } from "../src/theme";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -105,10 +106,7 @@ function PortraitCard({
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function EncounterScreen() {
-  const { encounterJson } = useLocalSearchParams<{ encounterJson: string }>();
-
-  let initial: EncounterResponse | null = null;
-  try { initial = JSON.parse(encounterJson ?? "null"); } catch { /* handled */ }
+  const initial = sessionStore.getEncounter();
 
   const [lines, setLines] = useState<EncounterLine[]>(initial?.lines ?? []);
   const [relationship, setRelationship] = useState(initial?.relationship ?? "");
@@ -202,16 +200,24 @@ export default function EncounterScreen() {
     try {
       const data = await encounter(persona1.objectKey, persona2.objectKey, dynamic);
       if (!mounted.current) return;
+      sessionStore.setEncounter(data);
       setLines(data.lines);
       setRelationship(data.relationship);
       replayLoadingRef.current = false;
       setReplayLoading(false);
+      setDone(false);
       startScene(data.lines);
     } catch {
       replayLoadingRef.current = false;
       setReplayLoading(false);
     }
   }, [persona1, persona2, startScene]);
+
+  const replayCurrentScene = useCallback(() => {
+    if (lines.length === 0) return;
+    setDone(false);
+    startScene(lines);
+  }, [lines, startScene]);
 
   if (!initial || !persona1 || !persona2) {
     return (
@@ -312,7 +318,13 @@ export default function EncounterScreen() {
               </View>
             ) : (
               <>
-                <Text style={styles.replayLabel}>PLAY IT AGAIN AS…</Text>
+                <Pressable
+                  style={({ pressed }) => [styles.replayBtn, pressed && { opacity: 0.7 }]}
+                  onPress={replayCurrentScene}
+                >
+                  <Text style={styles.replayBtnText}>↺ replay this exchange</Text>
+                </Pressable>
+                <Text style={styles.replayLabel}>REWRITE AS…</Text>
                 <View style={styles.chips}>
                   {REPLAY_DYNAMICS.map(({ label, value }) => (
                     <Pressable
@@ -327,7 +339,13 @@ export default function EncounterScreen() {
               </>
             )}
 
-            {/* Back */}
+            {/* Exit CTAs */}
+            <Pressable
+              style={({ pressed }) => [styles.seanceBtn, pressed && { opacity: 0.85 }]}
+              onPress={() => router.replace("/")}
+            >
+              <Text style={styles.seanceBtnText}>summon another object →</Text>
+            </Pressable>
             <Pressable onPress={() => router.back()} style={styles.backWrap}>
               <Text style={styles.backText}>return to the spirits</Text>
             </Pressable>
@@ -575,6 +593,35 @@ const styles = StyleSheet.create({
     color: "#7A1F0C",
   },
 
+  replayBtn: {
+    alignSelf: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: "#34B7A0",
+    borderRadius: 6,
+    marginBottom: SP.md,
+  },
+  replayBtnText: {
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    color: "#34B7A0",
+    letterSpacing: 1,
+  },
+  seanceBtn: {
+    marginHorizontal: SP.lg,
+    marginTop: SP.md,
+    paddingVertical: 14,
+    backgroundColor: "#1C4A44",
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  seanceBtnText: {
+    fontFamily: FONTS.mono,
+    fontSize: 13,
+    color: "#C8F0EB",
+    letterSpacing: 1,
+  },
   backWrap: { paddingVertical: 8 },
   backText: {
     fontFamily: FONTS.mono,
