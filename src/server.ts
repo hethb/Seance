@@ -1,7 +1,7 @@
 import express from "express";
 import multer from "multer";
 import { config, caps, logCapabilities } from "./config.js";
-import { awaken, reply, generateEncounter, type ImageInput } from "./lib/claude.js";
+import { awaken, reply, generateEncounter, pickVoice, type ImageInput } from "./lib/claude.js";
 import { paintPortrait, generateMysteryPortrait } from "./lib/imagegen.js";
 import { transcribe, speak } from "./lib/deepgram.js";
 import { loadState, saveState } from "./lib/memory.js";
@@ -47,6 +47,12 @@ app.post("/api/awaken", async (req, res) => {
     if (typeof req.body.objectKey === "string" && req.body.objectKey.trim()) {
       persona.objectKey = normalizeKey(req.body.objectKey);
     }
+
+    // Cast a voice deterministically from the final objectKey + archetype, so
+    // different objects sound different and the same object keeps its voice across
+    // re-awakenings. Overrides Claude's pick. (Returning objects below reuse the
+    // prior persona, so an established object's voice never changes.)
+    persona.voiceModel = pickVoice(persona.archetype, persona.objectKey);
 
     // 2. Has this object been awakened before? (memory / the "remembers you" beat)
     const prior = await loadState(persona.objectKey);

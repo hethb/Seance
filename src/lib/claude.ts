@@ -37,6 +37,65 @@ const VOICE_MODELS = [
   "aura-2-zeus-en", // booming masculine
 ] as const;
 
+// Deterministic voice casting. Each object gets a voice that FITS its archetype
+// but VARIES across objects, chosen by a stable hash of its objectKey. This is
+// assigned server-side (overriding Claude's pick) so two objects rarely share a
+// voice and the fallback persona no longer always sounds like the default.
+// All ids validated against the Deepgram aura-2 catalog.
+const ARCHETYPE_VOICES: Record<Archetype, readonly string[]> = {
+  // old, gruff, weathered, deep
+  grumpy_elder: [
+    "aura-2-orion-en",
+    "aura-2-zeus-en",
+    "aura-2-atlas-en",
+    "aura-2-saturn-en",
+    "aura-2-draco-en",
+  ],
+  // theatrical, regal, expressive
+  dramatic_diva: [
+    "aura-2-hera-en",
+    "aura-2-athena-en",
+    "aura-2-cordelia-en",
+    "aura-2-callista-en",
+    "aura-2-theia-en",
+  ],
+  // flat, dry, unhurried
+  deadpan_stoic: [
+    "aura-2-arcas-en",
+    "aura-2-apollo-en",
+    "aura-2-mars-en",
+    "aura-2-hyperion-en",
+    "aura-2-minerva-en",
+  ],
+  // bright, quick, nervy, young
+  anxious_overachiever: [
+    "aura-2-luna-en",
+    "aura-2-helena-en",
+    "aura-2-aurora-en",
+    "aura-2-ophelia-en",
+    "aura-2-hermes-en",
+  ],
+};
+
+const ALL_VOICES = Object.values(ARCHETYPE_VOICES).flat();
+
+/** Stable, fast string hash (FNV-ish) — deterministic across runs and machines. */
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+/**
+ * Cast a Deepgram voice for an object: fitting by archetype, varied by objectKey,
+ * and stable (the same object always gets the same voice). Unknown archetype →
+ * the full pool, so it still gets a real, varied voice.
+ */
+export function pickVoice(archetype: string, objectKey: string): string {
+  const pool = ARCHETYPE_VOICES[archetype as Archetype] ?? ALL_VOICES;
+  return pool[hashString(objectKey) % pool.length]!;
+}
+
 // The tool whose schema Claude is FORCED to fill. Forcing structured output via
 // tool use is far more reliable than asking for JSON and parsing prose — the
 // model literally cannot emit markdown fences or preamble, only schema-shaped
@@ -267,6 +326,13 @@ export async function reply(
       ? `\n\nThis is encounter #${encounters} with a human — you have met before. Reference your shared history naturally if it fits.`
       : "";
 
+  // Replies are spoken aloud. Push for natural delivery and let the character add
+  // a short *stage direction* for tone. Those asterisk spans are stripped before
+  // TTS and display — writing them just makes the surrounding dialogue more
+  // expressive and in-character.
+  const deliveryNote =
+    "\n\nDelivery: you are speaking aloud — natural rhythm, contractions, never narrate your own name. You may add at most ONE short *stage direction* in asterisks (e.g. *sighs*, *leans in*), a few words max; everything else is spoken dialogue.";
+
   // Cap replayed history so a long demo session can't grow tokens/latency
   // unboundedly turn-over-turn — the last ~20 turns is plenty of context.
   let message;
@@ -275,7 +341,7 @@ export async function reply(
       model: config.anthropicReplyModel,
       max_tokens: 300,
       // Short max_tokens keeps the spoken reply snappy in a live voice loop.
-      system: persona.systemPrompt + memoryNote,
+      system: persona.systemPrompt + memoryNote + deliveryNote,
       messages: [
         ...history.slice(-20).map((t) => ({ role: t.role, content: t.text })),
         { role: "user" as const, content: userText },
