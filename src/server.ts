@@ -5,6 +5,7 @@ import { awaken, reply, generateEncounter, archetypeCatalog, isArchetype, type I
 import { paintPortrait, generateMysteryPortrait } from "./lib/imagegen.js";
 import { transcribe, speak } from "./lib/deepgram.js";
 import { loadState, saveState } from "./lib/memory.js";
+import { recordSession, listSessions, getSession } from "./lib/history.js";
 import type { SessionState } from "./types.js";
 
 // API only — the client is the Expo phone app in app/. No static web frontend.
@@ -24,6 +25,39 @@ app.use(express.json({ limit: "15mb" }));
  */
 app.get("/api/archetypes", (_req, res) => {
   res.json({ archetypes: archetypeCatalog() });
+});
+
+/**
+ * GET /api/history
+ * The "past chats" gallery — every remembered object, most recent first.
+ */
+app.get("/api/history", async (_req, res) => {
+  try {
+    res.json({ sessions: await listSessions() });
+  } catch (err) {
+    console.error("history list failed:", err);
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+/**
+ * GET /api/history/:objectKey
+ * Reopen a past chat: the persona + portrait + full transcript to revisit.
+ */
+app.get("/api/history/:objectKey", async (req, res) => {
+  try {
+    const state = await getSession(req.params.objectKey);
+    if (!state) return res.status(404).json({ error: "That memory has faded — awaken it again." });
+    res.json({
+      persona: state.persona,
+      portraitUrl: state.portraitUrl,
+      encounters: state.encounters,
+      history: state.history,
+    });
+  } catch (err) {
+    console.error("history fetch failed:", err);
+    res.status(500).json({ error: String(err) });
+  }
 });
 
 /**
@@ -80,6 +114,7 @@ app.post("/api/awaken", async (req, res) => {
       encounters: (prior?.encounters ?? 0) + 1,
     };
     await saveState(state);
+    await recordSession(state); // index it for the "past chats" gallery
 
     res.json({
       persona: state.persona,
@@ -132,6 +167,7 @@ app.post("/api/converse", upload.single("audio"), async (req, res) => {
     state.history.push({ role: "user", text: userText });
     state.history.push({ role: "assistant", text: replyText });
     await saveState(state);
+    await recordSession(state); // refresh the gallery preview/timestamp
 
     // 4. Voice it. A TTS failure must NOT lose the (already-generated) reply —
     //    degrade to null so the client still renders the text.
