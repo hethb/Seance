@@ -311,12 +311,16 @@ function AvatarAura({ speaking }: { speaking: boolean }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const morph = useRef(new Animated.Value(0)).current;
 
+  // opacity and the morphing borderRadius drive the SAME Animated.View. RN forbids
+  // mixing drivers on one node, and borderRadius can't use the native driver — so
+  // every animation here must be useNativeDriver: false, or it crashes with
+  // "JS driven animation on animated node that has been moved to native earlier".
   useEffect(() => {
     if (speaking) {
       const opacityLoop = Animated.loop(
         Animated.sequence([
-          Animated.timing(opacity, { toValue: 0.75, duration: 700, useNativeDriver: true }),
-          Animated.timing(opacity, { toValue: 0.2, duration: 700, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.75, duration: 700, useNativeDriver: false }),
+          Animated.timing(opacity, { toValue: 0.2, duration: 700, useNativeDriver: false }),
         ])
       );
       const morphLoop = Animated.loop(
@@ -329,7 +333,7 @@ function AvatarAura({ speaking }: { speaking: boolean }) {
       morphLoop.start();
       return () => { opacityLoop.stop(); morphLoop.stop(); };
     } else {
-      Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }).start();
+      Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: false }).start();
       morph.setValue(0);
     }
   }, [speaking]);
