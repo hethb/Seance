@@ -457,10 +457,8 @@ function ConversationView({ result }: { result: AwakenResponse }) {
   }, []);
 
   const handleIntroduce = useCallback(() => {
-    router.push({
-      pathname: "/",
-      params: { challengerJson: JSON.stringify(result) },
-    });
+    sessionStore.setChallenger(result);
+    router.push("/");
   }, [result]);
 
   const handleSend = useCallback(() => {

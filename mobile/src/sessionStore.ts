@@ -14,6 +14,7 @@ import type { AwakenResponse } from "./api";
  */
 let capturedImage: string | null = null;
 let awakenResult: AwakenResponse | null = null;
+let challengerResult: AwakenResponse | null = null;
 
 export const sessionStore = {
   setImage(dataUrl: string) {
@@ -28,8 +29,18 @@ export const sessionStore = {
   getResult(): AwakenResponse | null {
     return awakenResult;
   },
+  setChallenger(result: AwakenResponse) {
+    challengerResult = result;
+  },
+  getChallenger(): AwakenResponse | null {
+    return challengerResult;
+  },
+  clearChallenger() {
+    challengerResult = null;
+  },
   clear() {
     capturedImage = null;
     awakenResult = null;
+    challengerResult = null;
   },
 };

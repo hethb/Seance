@@ -26,6 +26,7 @@ import { C, FONTS, R, SP } from '../src/theme';
 
 const LEDGER_TONES = ['#0F6B5C', '#B8923C', '#D93D1A'];
 
+
 // ── Corner bracket decoration ─────────────────────────────────────────────────
 
 function CornerBracket({
@@ -56,7 +57,7 @@ function CornerBracket({
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function CaptureScreen() {
-  const { challengerJson } = useLocalSearchParams<{ challengerJson?: string }>();
+  const challengerResult = sessionStore.getChallenger();
   const [photo, setPhoto] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -144,9 +145,7 @@ export default function CaptureScreen() {
     navLock.current = true;
     onPressBtn();
     setError(null);
-    setLoading(true); // stays true through the transition; resets on screen remount
-    // Hand the photo off by reference instead of through nav params (it's a
-    // multi-MB data URL — serializing it into navigation state stalls the JS thread).
+    setLoading(true);
     sessionStore.setImage(photo);
     router.push('/awaken');
   }
@@ -176,11 +175,11 @@ export default function CaptureScreen() {
           <Text style={styles.brand}>Séance</Text>
 
           {/* Separator row — or rival banner when in introduction mode */}
-          {challengerJson ? (
+          {challengerResult ? (
             <View style={styles.rivalBanner}>
               <Text style={styles.rivalBannerText}>
                 ✦ INTRODUCING{" "}
-                {(() => { try { return (JSON.parse(challengerJson) as { persona: { name: string } }).persona.name.toUpperCase(); } catch { return "THE SPIRIT"; } })()}
+                {challengerResult.persona.name.toUpperCase()}
                 {" "}TO…
               </Text>
             </View>
