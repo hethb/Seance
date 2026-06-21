@@ -38,6 +38,7 @@ export default function EncounterScreen({ route, navigation }: Props) {
   const [lines, setLines] = useState<EncounterLine[]>(route.params.lines);
   const [relationship, setRelationship] = useState(route.params.relationship);
   const [replayLoading, setReplayLoading] = useState(false);
+  const replayLoadingRef = useRef(false);
 
   const [currentLine, setCurrentLine] = useState(-1);
   const [playing, setPlaying] = useState(false);
@@ -117,19 +118,22 @@ export default function EncounterScreen({ route, navigation }: Props) {
 
   // Replay with a chosen dynamic — re-fetches from the API.
   const replayAs = useCallback(async (dynamic?: string) => {
-    if (replayLoading || playing) return;
+    if (replayLoadingRef.current) return;
+    replayLoadingRef.current = true;
     setReplayLoading(true);
     try {
       const data = await encounter(persona1.objectKey, persona2.objectKey, dynamic);
       if (!mounted.current) return;
       setLines(data.lines);
       setRelationship(data.relationship);
+      replayLoadingRef.current = false;
       setReplayLoading(false);
       startScene(data.lines);
     } catch {
+      replayLoadingRef.current = false;
       setReplayLoading(false);
     }
-  }, [persona1.objectKey, persona2.objectKey, replayLoading, playing, startScene]);
+  }, [persona1.objectKey, persona2.objectKey, startScene]);
 
   const uri1 = resolveMediaUrl(portraitUrl1);
   const uri2 = resolveMediaUrl(portraitUrl2);
@@ -189,25 +193,26 @@ export default function EncounterScreen({ route, navigation }: Props) {
               <Text style={styles.verdictText}>{relationship}</Text>
             </View>
 
-            <Text style={styles.replayHeading}>Play it again as…</Text>
-            <View style={styles.chips}>
-              {REPLAY_DYNAMICS.map(({ label, value }) => (
-                <Pressable
-                  key={label}
-                  style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
-                  onPress={() => replayAs(value)}
-                  disabled={replayLoading}
-                >
-                  <Text style={styles.chipText}>{label}</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            {replayLoading && (
+            {replayLoading ? (
               <View style={styles.replayLoader}>
                 <ActivityIndicator color={colors.spirit} />
                 <Text style={styles.replayLoaderText}>Rewriting fate…</Text>
               </View>
+            ) : (
+              <>
+                <Text style={styles.replayHeading}>Play it again as…</Text>
+                <View style={styles.chips}>
+                  {REPLAY_DYNAMICS.map(({ label, value }) => (
+                    <Pressable
+                      key={label}
+                      style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
+                      onPress={() => replayAs(value)}
+                    >
+                      <Text style={styles.chipText}>{label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </>
             )}
 
             <Pressable style={styles.secondary} onPress={() => navigation.popToTop()}>
