@@ -78,6 +78,27 @@ const ARCHETYPES: Record<Archetype, string> = {
 
 const ARCHETYPE_KEYS = Object.keys(ARCHETYPES) as Archetype[];
 
+export interface ArchetypeOption {
+  key: Archetype;
+  /** Human-friendly label for the UI picker, e.g. "Grumpy Elder". */
+  label: string;
+  description: string;
+}
+
+/** The full archetype list for the UI personality picker. */
+export function archetypeCatalog(): ArchetypeOption[] {
+  return ARCHETYPE_KEYS.map((key) => ({
+    key,
+    label: key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+    description: ARCHETYPES[key],
+  }));
+}
+
+/** Narrow arbitrary input (e.g. a request body field) to a known archetype key. */
+export function isArchetype(value: unknown): value is Archetype {
+  return typeof value === "string" && (ARCHETYPE_KEYS as string[]).includes(value);
+}
+
 // Deepgram TTS voices the character may be cast with. (Mirrors the options the
 // voice hop supports.) Used both to constrain Claude and to validate its pick.
 const VOICE_MODELS = [
@@ -174,13 +195,16 @@ const EMIT_PERSONA_TOOL: Anthropic.Tool = {
   },
 };
 
-function systemPrompt(): string {
+function systemPrompt(forceArchetype?: Archetype): string {
   const guide = ARCHETYPE_KEYS.map((k) => `- ${k}: ${ARCHETYPES[k]}`).join("\n");
+  const pickLine = forceArchetype
+    ? `The user has CHOSEN the "${forceArchetype}" archetype. You MUST set archetype="${forceArchetype}" and write the ENTIRE persona (name, tagline, backstory, traits, openingLine, systemPrompt) in that voice — do not pick a different one. Full archetype reference:`
+    : "Pick the single best-fit archetype and COMMIT to its voice completely — let it color the name, tagline, backstory, traits, the openingLine, and especially the systemPrompt:";
   return [
     "You are the spirit medium behind Séance. You look at an everyday object and channel the larger-than-life character secretly living inside it.",
     "First, identify the object. Set objectRecognized true ONLY when you can confidently name a specific physical object. If the photo is blurry, empty, or dominated by a person or scene rather than a thing, set objectRecognized false — but STILL invent a fun persona (use a vague objectKey/object and let the character riff on its own mysteriousness).",
     "Be funny first, specific second, theatrical third. The humor comes from the gap between a mundane object and an outsized inner life — lean into what this SPECIFIC object endures (a stapler's thankless labor, a water bottle's abandonment, a charger's codependency).",
-    "Pick the single best-fit archetype and COMMIT to its voice completely — let it color the name, tagline, backstory, traits, the openingLine, and especially the systemPrompt:",
+    pickLine,
     guide,
     "The character will speak aloud to a stranger, so give it a strong, playable, instantly-recognizable voice. The openingLine is the funny first thing it blurts out the moment it wakes up and notices a human — make it land. Then call the emit_persona tool with the result.",
   ].join("\n\n");
@@ -252,18 +276,37 @@ function imageSource(image: ImageInput): Anthropic.ImageBlockParam["source"] {
     : { type: "base64", media_type: image.mediaType as "image/jpeg", data: image.base64 };
 }
 
+export interface AwakenOptions {
+  /**
+   * Force a specific archetype the user picked in the UI, instead of letting
+   * Claude recommend the best fit. The object is still identified from the photo.
+   */
+  forceArchetype?: Archetype;
+}
+
+/**
+ * Scope the memory key to (object KIND × archetype) so each chosen personality
+ * is remembered as its own being — and deliberately switching personality for
+ * the same object doesn't reuse the previous character's saved state.
+ */
+function withMemoryKey(persona: Persona): Persona {
+  return { ...persona, objectKey: `${persona.objectKey}--${persona.archetype}` };
+}
+
 /**
  * Look at a captured photo and invent the persona living inside the object.
  * @param image base64 + mediaType (e.g. from the camera data URL) OR a public url.
+ * @param opts  forceArchetype to honor the user's personality pick.
  */
-export async function awaken(image: ImageInput): Promise<Persona> {
-  if (!client) return mockPersona();
+export async function awaken(image: ImageInput, opts: AwakenOptions = {}): Promise<Persona> {
+  const { forceArchetype } = opts;
+  if (!client) return withMemoryKey(mockPersona(forceArchetype));
 
   try {
     const message = await client.messages.create({
       model: config.anthropicVisionModel,
       max_tokens: 2048,
-      system: systemPrompt(),
+      system: systemPrompt(forceArchetype),
       tools: [EMIT_PERSONA_TOOL],
       // Force the model to call emit_persona — it cannot reply with free text.
       tool_choice: { type: "tool", name: EMIT_PERSONA_TOOL.name },
@@ -291,13 +334,15 @@ export async function awaken(image: ImageInput): Promise<Persona> {
       console.warn("awaken: Claude response failed validation — using fallback persona", {
         stopReason: message.stop_reason,
       });
-      return fallbackPersona();
+      return withMemoryKey(fallbackPersona(forceArchetype));
     }
-    return persona;
+    // The user's explicit pick is authoritative, even if the model drifted.
+    if (forceArchetype) persona.archetype = forceArchetype;
+    return withMemoryKey(persona);
   } catch (err) {
     // Network/API failure must never break /api/awaken — degrade to a canned persona.
     console.error("awaken: Anthropic call failed — using fallback persona:", err);
-    return fallbackPersona();
+    return withMemoryKey(fallbackPersona(forceArchetype));
   }
 }
 
@@ -351,12 +396,12 @@ export async function reply(
  * playable character so a flaky call still demos cleanly and never 500s.
  * deadpan_stoic by design — generic enough to fit any object.
  */
-function fallbackPersona(): Persona {
+function fallbackPersona(forceArchetype?: Archetype): Persona {
   return {
     // The recognition failed (or the call did), so flag it: downstream should
     // paint a generated fallback portrait rather than trust the raw photo.
     objectRecognized: false,
-    archetype: "deadpan_stoic",
+    archetype: forceArchetype ?? "deadpan_stoic",
     objectKey: "unidentified-object",
     object: "an unidentified object",
     name: "The Object",
@@ -376,10 +421,10 @@ function fallbackPersona(): Persona {
 // ── Mock fallbacks (no ANTHROPIC_API_KEY) ────────────────────────────────────
 // These keep the whole app demoable before the Anthropic booth hands you a key.
 
-function mockPersona(): Persona {
+function mockPersona(forceArchetype?: Archetype): Persona {
   return {
     objectRecognized: false,
-    archetype: "deadpan_stoic",
+    archetype: forceArchetype ?? "deadpan_stoic",
     objectKey: "demo-object",
     object: "a mysterious object",
     name: "Mock the Unawakened",

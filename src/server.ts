@@ -1,7 +1,7 @@
 import express from "express";
 import multer from "multer";
 import { config, caps, logCapabilities } from "./config.js";
-import { awaken, reply, generateEncounter, type ImageInput } from "./lib/claude.js";
+import { awaken, reply, generateEncounter, archetypeCatalog, isArchetype, type ImageInput } from "./lib/claude.js";
 import { paintPortrait, generateMysteryPortrait } from "./lib/imagegen.js";
 import { transcribe, speak } from "./lib/deepgram.js";
 import { loadState, saveState } from "./lib/memory.js";
@@ -19,9 +19,19 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 
 app.use(express.json({ limit: "15mb" }));
 
 /**
+ * GET /api/archetypes
+ * The personality catalog (key + label + description) for the UI picker.
+ */
+app.get("/api/archetypes", (_req, res) => {
+  res.json({ archetypes: archetypeCatalog() });
+});
+
+/**
  * POST /api/awaken
- * Body: { image: "data:image/jpeg;base64,..." | "https://..." }
+ * Body: { image: "data:image/jpeg;base64,..." | "https://...", archetype?: string }
  * Pipeline: photo → Claude invents persona → paint portrait → load/save memory.
+ * Omit `archetype` to get Claude's recommendation; pass one of /api/archetypes
+ * to force the personality the user picked.
  * Returns the persona + portrait + how many times this object has been met.
  */
 app.post("/api/awaken", async (req, res) => {
@@ -38,8 +48,11 @@ app.post("/api/awaken", async (req, res) => {
       return res.status(400).json({ error: "Expected { image: dataURL | https URL }" });
     }
 
-    // 1. Channel the character from the photo.
-    const persona = await awaken(input);
+    // Optional: honor the personality the user chose; ignore unknown values.
+    const forceArchetype = isArchetype(req.body.archetype) ? req.body.archetype : undefined;
+
+    // 1. Channel the character from the photo (honoring the user's picked archetype).
+    const persona = await awaken(input, { forceArchetype });
     persona.objectKey = normalizeKey(persona.objectKey);
     // Optional override: a client may pin a stable objectKey so the same
     // rehearsed object reliably "remembers you" across scans, even if Claude's
