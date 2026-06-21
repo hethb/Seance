@@ -729,7 +729,15 @@ export async function generateEncounter(
 
     const parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1)) as EncounterResult;
     if (!Array.isArray(parsed.lines) || parsed.lines.length === 0) return mockEncounter(persona1, persona2);
-    return parsed;
+    // The model sometimes labels speakers with names or odd casing, which breaks the
+    // strict "object1"/"object2" check in the UI and makes every line look like one
+    // speaker. The scene is written to strictly alternate (object1 first), so normalize
+    // speakers by line index and ignore whatever label the model emitted.
+    const lines: EncounterLine[] = parsed.lines
+      .filter((l) => l && typeof l.text === "string" && l.text.trim().length > 0)
+      .map((l, i) => ({ speaker: i % 2 === 0 ? "object1" : "object2", text: l.text.trim() }));
+    if (lines.length === 0) return mockEncounter(persona1, persona2);
+    return { lines, relationship: parsed.relationship };
   } catch {
     return mockEncounter(persona1, persona2);
   }
