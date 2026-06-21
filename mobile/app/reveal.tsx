@@ -23,7 +23,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Defs, Pattern, Circle, Rect } from "react-native-svg";
-import type { AwakenResponse } from "../src/api";
+import { encounter, type AwakenResponse } from "../src/api";
 import type { Persona } from "../src/types";
 import { sessionStore } from "../src/sessionStore";
 
@@ -307,7 +307,6 @@ export default function RevealScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const { encounter } = await import("../src/api");
         const data = await encounter(challengerResult.persona.objectKey, result.persona.objectKey);
         if (cancelled) return;
         router.replace({ pathname: "/encounter", params: { encounterJson: JSON.stringify(data) } });
