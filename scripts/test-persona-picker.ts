@@ -172,7 +172,7 @@ async function testSelectPersonaEndpoint() {
   assert(personaData.persona.name === altPersona.name, "saved persona matches selected one", `expected "${altPersona.name}", got "${personaData.persona.name}"`);
 
   // Verify history was NOT wiped
-  assert(Array.isArray(personaData.persona === personaData.persona), "persona still valid after swap");
+  assert(typeof personaData.persona === "object" && personaData.persona !== null, "persona still valid after swap");
 
   console.log(`  objectKey: ${objectKey}`);
   console.log(`  swapped to: ${altPersona.name}`);
