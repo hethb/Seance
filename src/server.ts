@@ -41,6 +41,12 @@ app.post("/api/awaken", async (req, res) => {
     // 1. Channel the character from the photo.
     const persona = await awaken(input);
     persona.objectKey = normalizeKey(persona.objectKey);
+    // Optional override: a client may pin a stable objectKey so the same
+    // rehearsed object reliably "remembers you" across scans, even if Claude's
+    // freeform slug drifts between photos. Omitted by default → unchanged.
+    if (typeof req.body.objectKey === "string" && req.body.objectKey.trim()) {
+      persona.objectKey = normalizeKey(req.body.objectKey);
+    }
 
     // 2. Has this object been awakened before? (memory / the "remembers you" beat)
     const prior = await loadState(persona.objectKey);
@@ -91,7 +97,7 @@ app.post("/api/converse", upload.single("audio"), async (req, res) => {
     const userText: string = req.body.text?.trim()
       ? req.body.text.trim()
       : req.file
-        ? await transcribe(req.file.buffer, req.file.mimetype)
+        ? await transcribe(req.file.buffer, req.file.mimetype).catch(() => "")
         : "";
     if (!userText) return res.status(400).json({ error: "No speech or text received." });
 
@@ -103,8 +109,9 @@ app.post("/api/converse", upload.single("audio"), async (req, res) => {
     state.history.push({ role: "assistant", text: replyText });
     await saveState(state);
 
-    // 4. Voice it.
-    const audio = await speak(replyText, state.persona.voiceModel);
+    // 4. Voice it. A TTS failure must NOT lose the (already-generated) reply —
+    //    degrade to null so the client still renders the text.
+    const audio = await speak(replyText, state.persona.voiceModel).catch(() => null);
 
     res.json({
       userText,
