@@ -511,6 +511,8 @@ function ConversationView({ result }: { result: AwakenResponse }) {
             archetype={persona.archetype}
             speaking={agentSpeaking}
             style={cv.avatar}
+            face
+            size={46}
           />
         </View>
         <View style={cv.identity}>
